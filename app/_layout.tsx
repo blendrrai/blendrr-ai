@@ -1,0 +1,27 @@
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { LookProvider } from '../lib/state';
+import { colors } from '../lib/theme';
+
+export default function RootLayout() {
+  return (
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <SafeAreaProvider>
+        <LookProvider>
+          <StatusBar style="dark" />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.bg },
+              animation: 'slide_from_bottom',
+              animationDuration: 320,
+              gestureEnabled: true,
+            }}
+          />
+        </LookProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
+  );
+}
