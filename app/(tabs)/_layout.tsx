@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { Redirect, withLayoutContext } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Droplet, Flower2, ScanLine, Wand2, Wind } from 'lucide-react-native';
@@ -16,7 +16,7 @@ import {
 } from '@react-navigation/material-top-tabs';
 import type { ParamListBase, TabNavigationState } from '@react-navigation/native';
 import type { ComponentType } from 'react';
-import { colors, radius, shadow, spacing, type } from '../../lib/theme';
+import { colors, radius, shadow, spacing } from '../../lib/theme';
 import { loadOnboardingSeen } from '../../lib/storage';
 
 const { Navigator } = createMaterialTopTabNavigator();
@@ -130,7 +130,6 @@ function FloatingTabBar({ state, descriptors, navigation, position }: MaterialTo
               total={total}
               position={position}
               Icon={Icon}
-              label={label}
               onPress={onPress}
               accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
             />
@@ -171,7 +170,6 @@ function TabButton({
   total,
   position,
   Icon,
-  label,
   onPress,
   accessibilityLabel,
 }: {
@@ -179,7 +177,6 @@ function TabButton({
   total: number;
   position: MaterialTopTabBarProps['position'];
   Icon: ComponentType<IconProps>;
-  label: string;
   onPress: () => void;
   accessibilityLabel: string;
 }) {
@@ -208,19 +205,11 @@ function TabButton({
       style={[styles.tab, pressStyle]}
     >
       <Animated.View style={[StyleSheet.absoluteFill, styles.tabActiveBg, { opacity: activeOpacity }]} />
-      <View style={styles.tabContent}>
-        <View style={styles.iconStack}>
-          <Icon size={20} color={colors.text} strokeWidth={1.8} />
-          <Animated.View style={[StyleSheet.absoluteFill, styles.iconCenter, { opacity: activeOpacity }]}>
-            <Icon size={20} color={colors.primaryOn} strokeWidth={2.2} />
-          </Animated.View>
-        </View>
-        <View style={styles.labelStack}>
-          <Text style={styles.tabLabel}>{label}</Text>
-          <Animated.View style={[StyleSheet.absoluteFill, styles.labelCenter, { opacity: activeOpacity }]}>
-            <Text style={[styles.tabLabel, styles.tabLabelActive]}>{label}</Text>
-          </Animated.View>
-        </View>
+      <View style={styles.iconStack}>
+        <Icon size={22} color={colors.text} strokeWidth={1.8} />
+        <Animated.View style={[StyleSheet.absoluteFill, styles.iconCenter, { opacity: activeOpacity }]}>
+          <Icon size={22} color={colors.primaryOn} strokeWidth={2.2} />
+        </Animated.View>
       </View>
     </AnimatedPressable>
   );
@@ -272,26 +261,17 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   tab: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-    borderRadius: radius.pill,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
     overflow: 'hidden',
-    minWidth: 70,
   },
   tabActiveBg: {
     backgroundColor: colors.primary,
-    borderRadius: radius.pill,
+    borderRadius: 26,
   },
-  tabContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    justifyContent: 'center',
-  },
-  iconStack: { width: 20, height: 20 },
+  iconStack: { width: 22, height: 22 },
   iconCenter: { alignItems: 'center', justifyContent: 'center' },
-  labelStack: { position: 'relative' },
-  labelCenter: { alignItems: 'flex-start', justifyContent: 'center' },
-  tabLabel: { ...type.caption, color: colors.text, fontSize: 13 },
-  tabLabelActive: { color: colors.primaryOn, fontWeight: '600' },
 });
