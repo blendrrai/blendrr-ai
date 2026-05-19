@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   chipSelected: {
-    backgroundColor: colors.bg,
+    backgroundColor: colors.bgSoft,
     borderColor: colors.primary,
   },
   iconWrap: {
@@ -81,6 +81,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   iconWrapSelected: {
     backgroundColor: colors.primary,

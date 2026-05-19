@@ -8,17 +8,24 @@ type Props = {
   title: string;
   subtitle?: string;
   showBack?: boolean;
+  /** Override the default back behaviour (router.back). Useful on result pages where back should go home. */
+  onBack?: () => void;
 };
 
-export function StepHeader({ step, title, subtitle, showBack = true }: Props) {
+export function StepHeader({ step, title, subtitle, showBack = true, onBack }: Props) {
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+      return;
+    }
+    if (router.canGoBack()) router.back();
+  };
+  const canShow = showBack && (onBack ? true : router.canGoBack());
+
   return (
     <View style={styles.wrap}>
-      {showBack && router.canGoBack() && (
-        <Pressable
-          onPress={() => router.back()}
-          hitSlop={12}
-          style={styles.back}
-        >
+      {canShow && (
+        <Pressable onPress={handleBack} hitSlop={12} style={styles.back}>
           <ChevronLeft size={22} color={colors.text} strokeWidth={2} />
         </Pressable>
       )}

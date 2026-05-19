@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FFF5F8"
+      "backgroundColor": "#FCBACD"
     },
     "ios": {
       "supportsTablet": false,
@@ -54,7 +54,8 @@
         {
           "photosPermission": "Allow Blendrr Ai to pick selfies and product screenshots from your library."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "extra": {
       "router": {},
