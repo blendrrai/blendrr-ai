@@ -11,11 +11,10 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const TEXT_MODEL = 'gemini-2.5-flash';
-// Nano Banana 3.1 (preview) — generally better identity preservation + colour
-// fidelity than 2.5. Falls back to 2.5 if the preview model errors.
-// To roll back: change to 'gemini-2.5-flash-image'.
-const IMAGE_MODEL = 'gemini-3.1-flash-image-preview';
-const IMAGE_MODEL_FALLBACK = 'gemini-2.5-flash-image';
+// Nano Banana 2.5 (GA) — faster and tends to preserve source images better
+// than the 3.1 preview. Falls back to 3.1 only if 2.5 fails outright.
+const IMAGE_MODEL = 'gemini-2.5-flash-image';
+const IMAGE_MODEL_FALLBACK = 'gemini-3.1-flash-image-preview';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -156,48 +155,19 @@ async function handleTryOn(payload: { selfieImage: string; productImage: string;
   }
   const hex = shade.hex.startsWith('#') ? shade.hex : `#${shade.hex}`;
 
-  // Step 2: generate try-on image. SINGLE image input (selfie only) — Nano
-  // Banana is fundamentally a single-image editor and gets confused by a
-  // second reference image (returns text-only output). The hex string + verbal
-  // anti-darkening guidance is the only colour anchor.
-  const prompt = `You are applying a fully opaque layer of makeup to a portrait photograph. This is a precise local edit — preserve every pixel outside the target region exactly, but inside the target region, COMPLETELY REPLACE the existing colour with the target shade. Think of this like painting over the region with full-coverage cosmetic pigment, NOT applying a sheer tint or wash.
+  // Step 2: generate try-on image. Multi-image input — image 1 is the selfie
+  // to edit, image 2 is the product as a visual colour reference. Short prompt
+  // because verbose prompts + multi-image confuses Nano Banana into returning
+  // text-only output.
+  const prompt = `Two images. Image 1: a portrait. Image 2: a ${payload.zone === 'lips' ? 'lipstick product' : payload.zone === 'hair' ? 'hair colour product' : 'makeup product'}.
 
-TARGET REGION:
-${ZONE_REGION[payload.zone] ?? payload.zone}
+Read the exact colour of the ${payload.zone === 'lips' ? 'lipstick bullet' : 'product'} in image 2 — ignore packaging, cap, logos, and shadows. The colour is approximately ${hex} (${shade.description}).
 
-TARGET COLOUR — apply this exactly, at full coverage:
-- Hex: ${hex}
-- Description: ${shade.description}
-- Finish: ${shade.finish} (${FINISH_VISUAL[shade.finish] ?? 'natural finish'})
+Edit image 1: apply that colour to the ${payload.zone === 'lips' ? 'lips' : payload.zone === 'hair' ? 'hair' : 'face (cheeks/forehead)'} as a ${shade.finish} ${payload.zone === 'lips' ? 'lipstick' : payload.zone === 'hair' ? 'hair colour' : 'makeup'}. Opaque, full coverage — the result should clearly look like ${payload.zone === 'lips' ? 'lipstick has been applied' : payload.zone === 'hair' ? 'the hair has been dyed' : 'foundation/blush has been applied'}, not a sheer tint. Match the colour from image 2 precisely — do not darken or lighten.
 
-COVERAGE — this is critical:
-- The result must LOOK LIKE LIPSTICK/MAKEUP HAS BEEN APPLIED. A person comparing before and after should immediately see the colour has changed and the product has been "worn".
-- The natural underlying colour (e.g. bare lip pink) must be COMPLETELY COVERED by ${hex}. Do not show the underlying colour through the shade.
-- This applies even when ${hex} is close to the natural skin/lip tone (e.g. nudes, "your lips but better" shades). A nude lipstick is still OPAQUE — it just happens to be a nude colour. The before and after should still be visibly different because the surface texture and pigment coverage change.
-- Do NOT apply the shade as a sheer wash or tint. Full lipstick/foundation/cream coverage only.
+Preserve everything else in image 1 exactly: face, skin tone, freckles, eyes, hair (if not target), lighting, background, ${payload.zone === 'lips' ? 'lip shape' : 'shape of the target region'}. Edit ONLY the target region.
 
-COLOUR ACCURACY — separately from coverage:
-- ${hex} represents the shade in even, well-lit conditions. Apply at THAT brightness — neither darker nor lighter.
-- Do NOT auto-darken to "make it look more natural worn". The shade is calibrated.
-- Do NOT auto-lighten or desaturate to avoid looking bold. If the product is bold, the result should be bold.
-- A colour picker sampling the well-lit centre of the result should return within ~10% of ${hex}. Darker = wrong. Lighter / less saturated = also wrong.
-- For glossy/satin finishes, add reflective highlights ON TOP of the fully-applied base shade.
-- For matte finishes, the colour is flat and uniform across the region, no internal shading.
-
-ABSOLUTE PRESERVATION — these must remain identical to source:
-1. Identity, face shape, jawline, nose, brows, eye colour, expression
-2. Skin tone, texture, pores, freckles, moles — do NOT smooth or retouch
-3. Lighting direction, temperature, shadows, highlights
-4. Background — every pixel unchanged
-5. Hair (unless target) — colour, parting, texture
-6. Eyes — colour, lashes, existing eye makeup
-7. Lips (unless target) — natural colour and shape
-8. Clothing, jewellery, accessories
-9. Framing, crop, resolution, aspect ratio
-
-Apply ${hex} at FULL OPACITY with a ${shade.finish} finish across the target region. Change colour and coverage, not shape.
-
-Output: the edited image only.`;
+Output: the edited image 1.`;
 
   // Retry up to 3 times if the model returns text instead of an image (~5%
   // of the time — safety filter false positives, internal errors, timeouts).
@@ -215,6 +185,7 @@ Output: the edited image only.`;
           parts: [
             { text: prompt },
             { inlineData: { mimeType: 'image/jpeg', data: payload.selfieImage } },
+            { inlineData: { mimeType: 'image/jpeg', data: payload.productImage } },
           ],
         }],
       });
