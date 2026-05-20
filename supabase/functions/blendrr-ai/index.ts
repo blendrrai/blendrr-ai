@@ -11,7 +11,11 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const TEXT_MODEL = 'gemini-2.5-flash';
-const IMAGE_MODEL = 'gemini-2.5-flash-image';
+// Nano Banana 3.1 (preview) — generally better identity preservation + colour
+// fidelity than 2.5. Falls back to 2.5 if the preview model errors.
+// To roll back: change to 'gemini-2.5-flash-image'.
+const IMAGE_MODEL = 'gemini-3.1-flash-image-preview';
+const IMAGE_MODEL_FALLBACK = 'gemini-2.5-flash-image';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -193,9 +197,13 @@ Output: the edited image only.`;
   let imageBase64: string | null = null;
   let lastError: string | null = null;
   let textResponse: string | null = null;
+  // Try primary model (3.1 preview) for the first 2 attempts. If those fail,
+  // attempt 3 uses the 2.5 fallback — handles "preview model deprecated /
+  // unavailable" gracefully without users seeing a broken app.
   for (let attempt = 0; attempt < 3; attempt++) {
+    const model = attempt < 2 ? IMAGE_MODEL : IMAGE_MODEL_FALLBACK;
     try {
-      const parts = await callGemini(IMAGE_MODEL, {
+      const parts = await callGemini(model, {
         contents: [{
           parts: [
             { text: prompt },
@@ -211,10 +219,10 @@ Output: the edited image only.`;
       // No image returned — log what we got instead for debugging
       textResponse = extractText(parts).slice(0, 200);
       lastError = textResponse ? `No image. Model said: ${textResponse}` : 'No image returned';
-      console.log(`[try-on] attempt ${attempt + 1} returned no image. Text: ${textResponse}`);
+      console.log(`[try-on] attempt ${attempt + 1} (${model}) returned no image. Text: ${textResponse}`);
     } catch (e) {
       lastError = e instanceof Error ? e.message : 'Unknown error';
-      console.log(`[try-on] attempt ${attempt + 1} threw: ${lastError}`);
+      console.log(`[try-on] attempt ${attempt + 1} (${model}) threw: ${lastError}`);
       // Don't retry on safety blocks — those won't change on re-roll
       if (lastError.toLowerCase().includes('safety')) break;
     }
