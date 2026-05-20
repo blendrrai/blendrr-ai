@@ -152,36 +152,28 @@ async function handleTryOn(payload: { selfieImage: string; productImage: string;
   }
   const hex = shade.hex.startsWith('#') ? shade.hex : `#${shade.hex}`;
 
-  // Step 2: generate try-on image. We send BOTH images so the model has a
-  // visual colour reference, not just a hex string. Selfie is "image 1" and
-  // the product is "image 2" — we make this explicit in the prompt.
-  const prompt = `You are editing IMAGE 1 (a person's selfie) by transferring the COLOUR shown in IMAGE 2 (a beauty product) onto a specific region. This is a precise local edit — preserve every pixel of IMAGE 1 outside the target region.
+  // Step 2: generate try-on image. SINGLE image input (selfie only) — Nano
+  // Banana is fundamentally a single-image editor and gets confused by a
+  // second reference image (returns text-only output). The hex string + verbal
+  // anti-darkening guidance is the only colour anchor.
+  const prompt = `You are performing a PRECISE LOCAL EDIT on a portrait photograph. Preserve every pixel outside the target region exactly.
 
-TWO IMAGES PROVIDED:
-- IMAGE 1: the selfie. Edit only the target region.
-- IMAGE 2: the product. Use it as a visual colour reference. Read the brightest, most saturated point of the product itself (not its packaging, not the shadow side).
-
-TARGET REGION (on IMAGE 1):
+TARGET REGION:
 ${ZONE_REGION[payload.zone] ?? payload.zone}
 
-TARGET COLOUR:
-- Hex value: ${hex} — this is your source of truth
+TARGET COLOUR — this is your single source of truth, do not deviate:
+- Hex: ${hex}
 - Description: ${shade.description}
-- Visual reference: IMAGE 2 — read the colour off the actual product bullet/swatch, not packaging
+- Finish: ${shade.finish} (${FINISH_VISUAL[shade.finish] ?? 'natural finish'})
 
-TARGET FINISH:
-- Type: ${shade.finish}
-- Visual: ${FINISH_VISUAL[shade.finish] ?? 'natural finish'}
+COLOUR ACCURACY RULES — most try-on systems fail by over-darkening; do not do that:
+- ${hex} represents the shade as it would appear in even, well-lit conditions. Apply it at THAT brightness.
+- Do NOT darken, mute, or auto-shift the colour to make it "look more natural". The shade is already calibrated.
+- A colour-picker sampling the well-lit centre of the result should return a value within ~10% of ${hex}. If your output is visibly darker than ${hex}, you have failed.
+- For glossy/satin finishes, add specular highlights ON TOP of the base shade. Do NOT darken the base to imply gloss.
+- For matte finishes, the colour is flat and uniform across the region.
 
-COLOUR ACCURACY — this is the #1 thing people complain about:
-- The hex ${hex} represents the colour as it would appear in even, well-lit conditions. APPLY IT AT THAT BRIGHTNESS.
-- Do NOT auto-darken the shade to make it "look more natural worn". This is the most common failure mode of try-on systems and it makes the result look wrong.
-- IMAGE 2 shows you the actual colour — when in doubt, look at the brightest part of the product in IMAGE 2 and match that, NOT a darker interpretation of it.
-- The result lip/cheek/hair colour, sampled with a colour picker at the centre of the lit region, should be within 10% of ${hex}. If you produce something visibly darker, you have failed.
-- For glossy/satin finishes, add reflective highlights ON TOP of the base shade — do NOT darken the base to imply gloss.
-- For matte finishes, the colour is flat and uniform across the region — no internal shading.
-
-ABSOLUTE PRESERVATION OF IMAGE 1 — these must remain identical:
+ABSOLUTE PRESERVATION — these must remain identical to source:
 1. Identity, face shape, jawline, nose, brows, eye colour, expression
 2. Skin tone, texture, pores, freckles, moles — do NOT smooth or retouch
 3. Lighting direction, temperature, shadows, highlights
@@ -192,14 +184,15 @@ ABSOLUTE PRESERVATION OF IMAGE 1 — these must remain identical:
 8. Clothing, jewellery, accessories
 9. Framing, crop, resolution, aspect ratio
 
-ONLY modify the target region's pixels to match ${hex} with a ${shade.finish} finish. Respect the underlying form — change colour, not shape.
+ONLY modify the target region's pixels to ${hex} with a ${shade.finish} finish. Respect underlying form — change colour, not shape.
 
-Output: the edited IMAGE 1 only. Do not return IMAGE 2 or any composite.`;
+Output: the edited image only.`;
 
-  // Retry up to 2 times if the model returns text instead of an image (happens
-  // ~5% of the time — safety filter false positives, internal errors, etc.)
+  // Retry up to 3 times if the model returns text instead of an image (~5%
+  // of the time — safety filter false positives, internal errors, timeouts).
   let imageBase64: string | null = null;
   let lastError: string | null = null;
+  let textResponse: string | null = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const parts = await callGemini(IMAGE_MODEL, {
@@ -207,7 +200,6 @@ Output: the edited IMAGE 1 only. Do not return IMAGE 2 or any composite.`;
           parts: [
             { text: prompt },
             { inlineData: { mimeType: 'image/jpeg', data: payload.selfieImage } },
-            { inlineData: { mimeType: 'image/jpeg', data: payload.productImage } },
           ],
         }],
       });
@@ -216,9 +208,13 @@ Output: the edited IMAGE 1 only. Do not return IMAGE 2 or any composite.`;
         imageBase64 = imagePart.inlineData.data;
         break;
       }
-      lastError = 'No image returned';
+      // No image returned — log what we got instead for debugging
+      textResponse = extractText(parts).slice(0, 200);
+      lastError = textResponse ? `No image. Model said: ${textResponse}` : 'No image returned';
+      console.log(`[try-on] attempt ${attempt + 1} returned no image. Text: ${textResponse}`);
     } catch (e) {
       lastError = e instanceof Error ? e.message : 'Unknown error';
+      console.log(`[try-on] attempt ${attempt + 1} threw: ${lastError}`);
       // Don't retry on safety blocks — those won't change on re-roll
       if (lastError.toLowerCase().includes('safety')) break;
     }
