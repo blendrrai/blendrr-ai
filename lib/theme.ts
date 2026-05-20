@@ -30,18 +30,21 @@ export const spacing = {
 
 export const shadow = {
   card: {
-    shadowColor: '#7A1234',
-    shadowOpacity: 0.1,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 6,
+    // Neutral, low-intensity shadow — strong enough to lift cards off the
+    // page, weak enough not to bleed a darker pink halo into the gaps
+    // between stacked cards.
+    shadowColor: '#000000',
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
   button: {
     shadowColor: '#000000',
-    shadowOpacity: 0.25,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
   },
 } as const;
 
