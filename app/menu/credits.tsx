@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
-import { Check, ChevronRight, Coins, Copy, Crown, Gift, Info, Share2 } from 'lucide-react-native';
+import { Check, Coins, Copy, Crown, Gift, Info, Share2 } from 'lucide-react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -320,30 +320,6 @@ export default function Credits() {
             Pro for the rest of the current period.
           </Text>
 
-          <View style={styles.disclosureLinks}>
-            <Pressable
-              onPress={() => Linking.openURL('https://apps.apple.com/account/subscriptions')}
-              style={styles.disclosureLink}
-            >
-              <Text style={styles.disclosureLinkLabel}>Manage subscriptions</Text>
-              <ChevronRight size={14} color={colors.text} strokeWidth={2} />
-            </Pressable>
-            <Pressable
-              onPress={() => Linking.openURL('https://blendrr.ai/terms')}
-              style={styles.disclosureLink}
-            >
-              <Text style={styles.disclosureLinkLabel}>Terms of service</Text>
-              <ChevronRight size={14} color={colors.text} strokeWidth={2} />
-            </Pressable>
-            <Pressable
-              onPress={() => Linking.openURL('https://blendrr.ai/privacy')}
-              style={styles.disclosureLink}
-            >
-              <Text style={styles.disclosureLinkLabel}>Privacy policy</Text>
-              <ChevronRight size={14} color={colors.text} strokeWidth={2} />
-            </Pressable>
-          </View>
-
           <Text style={styles.disclosureFootnote}>
             Credit packs are one-off purchases — no recurring charges. Unused credits do not expire.
           </Text>
@@ -621,18 +597,5 @@ const styles = StyleSheet.create({
   disclosureTitle: { ...type.heading, fontSize: 14, color: colors.text },
   disclosureBody: { ...type.body, fontSize: 13, color: colors.textMuted, lineHeight: 19 },
   disclosureStrong: { color: colors.text, fontWeight: '700' },
-  disclosureLinks: { gap: 6, marginTop: spacing.xs },
-  disclosureLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.bg,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  disclosureLinkLabel: { ...type.caption, color: colors.text, fontWeight: '600', fontSize: 13 },
   disclosureFootnote: { ...type.caption, color: colors.textFaint, lineHeight: 18, marginTop: spacing.xs },
 });
