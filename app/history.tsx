@@ -119,7 +119,7 @@ export default function HistoryScreen() {
               <EmptyQuizChip
                 Icon={ScanLine}
                 label="Scan"
-                onPress={() => router.push('/ingredients')}
+                onPress={() => router.push('/ingredient-scan')}
               />
             </View>
           )}

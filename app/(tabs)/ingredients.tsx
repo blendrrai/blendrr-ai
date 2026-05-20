@@ -15,7 +15,7 @@ export default function IngredientsTab() {
       ctaLabel="Check ingredient health score"
       onStart={() => {
         resetIngredients();
-        router.push('/ingredients');
+        router.push('/ingredient-scan');
       }}
     />
   );

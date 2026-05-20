@@ -61,7 +61,9 @@
       "router": {},
       "eas": {
         "projectId": "d97f6f36-bd40-4e6a-8cab-da2c6249d1d6"
-      }
+      },
+      "supabaseUrl": "https://wjbevzhgwwybisxhwvhg.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqYmV2emhnd3d5YmlzeGh3dmhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyMjUyNzcsImV4cCI6MjA5NDgwMTI3N30.rfrh0s7UQJ1RhHOmCcgeL8U_sWthGHRJs0nyOea-S18"
     }
   }
 }

@@ -38,7 +38,7 @@ const ITEMS: Item[] = [
     label: 'Check ingredient health score',
     helper: 'Snap or paste any INCI list — get a 0–100 score',
     Icon: ScanLine,
-    route: '/ingredients',
+    route: '/ingredient-scan',
   },
   {
     label: 'My skincare routine',

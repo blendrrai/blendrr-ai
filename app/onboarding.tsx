@@ -3,6 +3,8 @@ import {
   Alert,
   Dimensions,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -137,6 +139,11 @@ export default function Onboarding() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}
+      >
       <View style={styles.topRow}>
         {index < PAGES.length - 1 ? (
           <Pressable onPress={skip} hitSlop={10} style={styles.skipBtn}>
@@ -218,6 +225,7 @@ export default function Onboarding() {
           <ArrowRight size={18} color={colors.primaryOn} strokeWidth={2.4} />
         </Pressable>
       </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -434,6 +442,7 @@ const FACE_RING_SIZE = 140;
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
+  flex: { flex: 1 },
   scroller: { flex: 1 },
   topRow: {
     flexDirection: 'row',

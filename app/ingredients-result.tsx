@@ -90,7 +90,7 @@ export default function IngredientsResult() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/ingredients');
+      router.replace('/ingredient-scan');
     }
   };
 

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { Check, ChevronRight, Coins, Crown, Info } from 'lucide-react-native';
+import * as Clipboard from 'expo-clipboard';
+import { Check, ChevronRight, Coins, Copy, Crown, Gift, Info, Share2 } from 'lucide-react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -16,6 +17,13 @@ import {
   type Currency,
   type Subscription,
 } from '../../lib/storage';
+import {
+  ensureUserProvisioned,
+  getCachedUser,
+  redeemReferralCode,
+  subscribeUser,
+  type User,
+} from '../../lib/user';
 
 const PRO_CREDITS_PER_MONTH = 30;
 
@@ -52,16 +60,57 @@ const PRO_FEATURES = [
 
 export default function Credits() {
   const [sub, setSub] = useState<Subscription>({ tier: 'free', credits: 3, currency: 'GBP' });
+  const [user, setUser] = useState<User | null>(getCachedUser());
+  const [codeInput, setCodeInput] = useState('');
+  const [redeeming, setRedeeming] = useState(false);
 
   const refresh = useCallback(() => {
     loadSubscription().then(setSub);
+    setUser(getCachedUser());
+    // If we don't have a user cached, try provisioning. Fails silently if offline.
+    if (!getCachedUser()) {
+      ensureUserProvisioned().catch(() => {
+        // ignore — UI shows "Loading…" until next refresh
+      });
+    }
   }, []);
 
   useEffect(() => {
     refresh();
+    return subscribeUser((u) => setUser(u));
   }, [refresh]);
 
   useFocusEffect(useCallback(() => refresh(), [refresh]));
+
+  const copyMyCode = async () => {
+    if (!user?.referral_code) return;
+    await Clipboard.setStringAsync(user.referral_code);
+    Alert.alert('Copied', `${user.referral_code} is on your clipboard.`);
+  };
+
+  const shareMyCode = async () => {
+    if (!user?.referral_code) return;
+    const message = `Try Blendrr Ai with my code ${user.referral_code} — match shades, build your routine, find your scent. We both get free credits ✨`;
+    try {
+      await Share.share({ message });
+    } catch {
+      // user cancelled
+    }
+  };
+
+  const redeemCode = async () => {
+    const code = codeInput.trim().toUpperCase();
+    if (!code) return;
+    setRedeeming(true);
+    const result = await redeemReferralCode(code);
+    setRedeeming(false);
+    if (result.ok) {
+      setCodeInput('');
+      Alert.alert('Code applied 🎉', `+${result.reward} credits added to your account.`);
+    } else {
+      Alert.alert("Code didn't apply", result.error);
+    }
+  };
 
   const currency = sub.currency ?? 'GBP';
   const proPrice = PRO_PRICES[currency];
@@ -184,6 +233,71 @@ export default function Credits() {
           {packs.map((pack) => (
             <CreditPack key={pack.credits} pack={pack} onBuy={() => buyCredits(pack)} />
           ))}
+        </View>
+
+        <View style={[styles.referralCard, shadow.card]}>
+          <View style={styles.referralHeader}>
+            <View style={styles.referralIcon}>
+              <Gift size={20} color={colors.text} strokeWidth={1.8} />
+            </View>
+            <View style={styles.referralHeaderText}>
+              <Text style={styles.referralTitle}>Refer a friend</Text>
+              <Text style={styles.referralHelper}>
+                You both get credits when they enter your code in onboarding.
+              </Text>
+            </View>
+          </View>
+
+          {user?.referral_code ? (
+            <View style={styles.codeBox}>
+              <Text style={styles.codeLabel}>YOUR CODE</Text>
+              <Text style={styles.codeValue}>{user.referral_code}</Text>
+            </View>
+          ) : (
+            <View style={styles.codeBox}>
+              <Text style={styles.codeLabel}>YOUR CODE</Text>
+              <Text style={styles.codeValuePending}>Loading…</Text>
+            </View>
+          )}
+
+          <View style={styles.referralActions}>
+            <Pressable onPress={copyMyCode} style={styles.refSecondary} disabled={!user?.referral_code}>
+              <Copy size={15} color={colors.text} strokeWidth={2} />
+              <Text style={styles.refSecondaryLabel}>Copy</Text>
+            </Pressable>
+            <Pressable onPress={shareMyCode} style={styles.refPrimary} disabled={!user?.referral_code}>
+              <Share2 size={15} color={colors.primaryOn} strokeWidth={2.2} />
+              <Text style={styles.refPrimaryLabel}>Share with a friend</Text>
+            </Pressable>
+          </View>
+
+          {!user?.has_redeemed_referral && (
+            <View style={styles.redeemWrap}>
+              <Text style={styles.redeemLabel}>Got a code from a friend?</Text>
+              <View style={styles.redeemRow}>
+                <TextInput
+                  value={codeInput}
+                  onChangeText={(t) => setCodeInput(t.toUpperCase())}
+                  placeholder="LUNA42"
+                  placeholderTextColor={colors.textFaint}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  maxLength={6}
+                  style={styles.redeemInput}
+                />
+                <Pressable
+                  onPress={redeemCode}
+                  disabled={redeeming || codeInput.trim().length < 4}
+                  style={[
+                    styles.redeemBtn,
+                    (redeeming || codeInput.trim().length < 4) && styles.redeemBtnDisabled,
+                  ]}
+                >
+                  <Text style={styles.redeemBtnLabel}>{redeeming ? '…' : 'Redeem'}</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
         </View>
 
         <View style={[styles.disclosureCard, shadow.card]}>
@@ -400,6 +514,100 @@ const styles = StyleSheet.create({
   packCredits: { ...type.title, fontSize: 28, color: colors.text },
   packCreditsLabel: { ...type.caption, color: colors.textMuted, fontSize: 11 },
   packPrice: { ...type.body, color: colors.text, fontWeight: '600', marginTop: 4 },
+  referralCard: {
+    backgroundColor: colors.bgSoft,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  referralHeader: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
+  referralIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  referralHeaderText: { flex: 1, gap: 2 },
+  referralTitle: { ...type.heading, fontSize: 16, color: colors.text },
+  referralHelper: { ...type.caption, color: colors.textMuted, lineHeight: 18 },
+  codeBox: {
+    backgroundColor: colors.bg,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
+    alignItems: 'center',
+    gap: 4,
+  },
+  codeLabel: { ...type.eyebrow, color: colors.textMuted, fontSize: 10 },
+  codeValue: {
+    ...type.display,
+    fontSize: 30,
+    color: colors.text,
+    letterSpacing: 4,
+    fontWeight: '700',
+  },
+  codeValuePending: { ...type.heading, color: colors.textFaint, fontSize: 16 },
+  referralActions: { flexDirection: 'row', gap: spacing.sm },
+  refSecondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    borderRadius: radius.pill,
+    backgroundColor: colors.bgSoft,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  refSecondaryLabel: { ...type.caption, color: colors.text, fontWeight: '600' },
+  refPrimary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+  },
+  refPrimaryLabel: { ...type.caption, color: colors.primaryOn, fontWeight: '600' },
+  redeemWrap: { gap: spacing.xs, marginTop: spacing.xs },
+  redeemLabel: { ...type.caption, color: colors.textMuted, fontWeight: '600' },
+  redeemRow: { flexDirection: 'row', gap: spacing.sm },
+  redeemInput: {
+    flex: 1,
+    height: 44,
+    paddingHorizontal: spacing.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    ...type.heading,
+    color: colors.text,
+    textAlign: 'center',
+    letterSpacing: 2,
+    fontSize: 15,
+  },
+  redeemBtn: {
+    paddingHorizontal: spacing.lg,
+    height: 44,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  redeemBtnDisabled: { opacity: 0.4 },
+  redeemBtnLabel: { ...type.heading, fontSize: 14, color: colors.primaryOn },
   disclosureCard: {
     backgroundColor: colors.bgSoft,
     borderRadius: radius.lg,
