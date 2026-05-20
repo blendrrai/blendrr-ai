@@ -8,7 +8,7 @@ import { StepHeader } from '../components/StepHeader';
 import { Button } from '../components/Button';
 import { AiError, AiLoading, NoCredits } from '../components/AiStatus';
 import { EnlargeButton, ImageEnlargerModal } from '../components/ImageEnlarger';
-import { colors, radius, shadow, spacing, type, zoneLabels } from '../lib/theme';
+import { colors, radius, shadow, spacing, type } from '../lib/theme';
 import { useLook } from '../lib/state';
 import { tryOn } from '../lib/blendrr';
 import { canUseCredit, saveTryOn } from '../lib/storage';
@@ -21,7 +21,7 @@ type State =
   | { kind: 'no-credits'; reason: string };
 
 export default function ResultScreen() {
-  const { selfieUri, productUri, productUrl, zone, resetTryOn } = useLook();
+  const { selfieUri, productUri, productUrl, zone, quality, resetTryOn } = useLook();
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [view, setView] = useState<'before' | 'after'>('after');
   const [saving, setSaving] = useState(false);
@@ -47,7 +47,7 @@ export default function ResultScreen() {
     }
 
     try {
-      const resultUri = await tryOn({ selfieUri, productUri, zone });
+      const resultUri = await tryOn({ selfieUri, productUri, zone, quality });
       await consumeCreditWithPrompt();
       await saveTryOn({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -66,7 +66,7 @@ export default function ResultScreen() {
     } finally {
       inFlight.current = false;
     }
-  }, [selfieUri, productUri, productUrl, zone]);
+  }, [selfieUri, productUri, productUrl, zone, quality]);
 
   useEffect(() => {
     run();
@@ -131,12 +131,15 @@ export default function ResultScreen() {
 
   const displayUri = view === 'before' ? selfieUri : state.kind === 'ok' ? state.uri : null;
 
+  const loadingHint = quality === 'ultra'
+    ? "Ultra HD try-ons take 40 seconds to 1 minute — we're getting every detail pixel-perfect. You can swipe to another app, but don't close Blendrr."
+    : "This usually takes 15–30 seconds. You can swipe to another app, but don't close Blendrr.";
+
   return (
     <Screen>
       <StepHeader
         step="Result"
         title="Your shade match"
-        subtitle={`Trying ${zoneLabels[zone].toLowerCase()} from your product.`}
         onBack={backHome}
       />
 
@@ -148,7 +151,7 @@ export default function ResultScreen() {
         {state.kind === 'loading' && (
           <AiLoading
             label="Blending your shade…"
-            hint="Try-ons take 20–40 seconds — we're getting the shade pixel-perfect. Keep the app open."
+            hint={loadingHint}
           />
         )}
         {state.kind === 'error' && <AiError message={state.message} onRetry={run} />}

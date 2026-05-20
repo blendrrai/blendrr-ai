@@ -62,10 +62,43 @@ export const type = {
   },
 } as const;
 
-export type Zone = 'face' | 'lips' | 'hair';
+export type Zone =
+  | 'lips'
+  | 'foundation'
+  | 'concealer'
+  | 'blush'
+  | 'bronzer'
+  | 'eyeliner'
+  | 'eyeshadow'
+  | 'mascara'
+  | 'eyebrows'
+  | 'hair';
 
 export const zoneLabels: Record<Zone, string> = {
-  face: 'Face',
   lips: 'Lips',
-  hair: 'Hair',
+  foundation: 'Foundation',
+  concealer: 'Concealer',
+  blush: 'Blush',
+  bronzer: 'Bronzer',
+  eyeliner: 'Eyeliner',
+  eyeshadow: 'Eyeshadow',
+  mascara: 'Mascara',
+  eyebrows: 'Eyebrows',
+  hair: 'Hair colour',
+};
+
+export type ZoneCategory = 'lips' | 'face' | 'eyes' | 'hair';
+
+export const ZONES_BY_CATEGORY: Record<ZoneCategory, Zone[]> = {
+  lips: ['lips'],
+  face: ['foundation', 'concealer', 'blush', 'bronzer'],
+  eyes: ['eyeliner', 'eyeshadow', 'mascara', 'eyebrows'],
+  hair: ['hair'],
+};
+
+export type Quality = 'medium' | 'ultra';
+
+export const qualityCost: Record<Quality, number> = {
+  medium: 1,
+  ultra: 2,
 };

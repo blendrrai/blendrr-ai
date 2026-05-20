@@ -4,21 +4,42 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import { Smile, Sparkles, Wind } from 'lucide-react-native';
-import { colors, radius, spacing, type } from '../lib/theme';
+import {
+  Brush,
+  Droplet,
+  Eye,
+  Heart,
+  Palette,
+  PenTool,
+  Slash,
+  Smile,
+  Sparkles,
+  Sun,
+  Wind,
+} from 'lucide-react-native';
+import type { ComponentType } from 'react';
+import { colors, radius, spacing, type, zoneLabels } from '../lib/theme';
 import type { Zone } from '../lib/theme';
 
-const ICONS = {
-  face: Sparkles,
-  lips: Smile,
-  hair: Wind,
-} as const;
+type IconProps = { size: number; color: string; strokeWidth: number };
 
-const LABELS: Record<Zone, string> = {
-  face: 'Face',
-  lips: 'Lips',
-  hair: 'Hair',
+const ICONS: Record<Zone, ComponentType<IconProps>> = {
+  lips: Smile,
+  foundation: Droplet,
+  concealer: Sparkles,
+  blush: Heart,
+  bronzer: Sun,
+  eyeliner: PenTool,
+  eyeshadow: Palette,
+  mascara: Brush,
+  eyebrows: Slash,
+  hair: Wind,
 };
+
+// Re-export so other places (e.g. result icons) can reuse if needed.
+export function getZoneIcon(zone: Zone): ComponentType<IconProps> {
+  return ICONS[zone] ?? Eye;
+}
 
 type Props = {
   zone: Zone;
@@ -46,13 +67,13 @@ export function ZoneChip({ zone, selected, onPress }: Props) {
     >
       <View style={[styles.iconWrap, selected && styles.iconWrapSelected]}>
         <Icon
-          size={22}
+          size={20}
           color={selected ? colors.primaryOn : colors.primary}
           strokeWidth={1.8}
         />
       </View>
-      <Text style={[styles.label, selected && styles.labelSelected]}>
-        {LABELS[zone]}
+      <Text style={[styles.label, selected && styles.labelSelected]} numberOfLines={1}>
+        {zoneLabels[zone]}
       </Text>
     </AnimatedPressable>
   );
@@ -63,7 +84,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.xs,
     borderRadius: radius.lg,
     backgroundColor: colors.bgSoft,
     borderWidth: 1.5,
@@ -75,9 +96,9 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.bg,
@@ -87,6 +108,6 @@ const styles = StyleSheet.create({
   iconWrapSelected: {
     backgroundColor: colors.primary,
   },
-  label: { ...type.caption, color: colors.textMuted, fontSize: 14 },
+  label: { ...type.caption, color: colors.textMuted, fontSize: 13 },
   labelSelected: { color: colors.text, fontWeight: '600' },
 });

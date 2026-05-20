@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
-import type { Zone } from './theme';
+import type { Quality, Zone } from './theme';
 import type { Answers } from '../components/Questionnaire';
 import {
   saveRoutineAnswers as persistAnswers,
@@ -12,9 +12,11 @@ type LookState = {
   productUri: string | null;
   productUrl: string | null;
   zone: Zone;
+  quality: Quality;
   setSelfie: (uri: string | null) => void;
   setProduct: (uri: string | null, sourceUrl?: string | null) => void;
   setZone: (zone: Zone) => void;
+  setQuality: (quality: Quality) => void;
   resetTryOn: () => void;
 
   routineAnswers: Record<RoutineCategory, Answers>;
@@ -51,6 +53,7 @@ export function LookProvider({ children }: { children: ReactNode }) {
   const [productUri, setProductUri] = useState<string | null>(null);
   const [productUrl, setProductUrl] = useState<string | null>(null);
   const [zone, setZone] = useState<Zone>('lips');
+  const [quality, setQuality] = useState<Quality>('medium');
 
   const [routineAnswers, setAllAnswers] = useState<Record<RoutineCategory, Answers>>(emptyAnswers);
   const [routinePhotos, setAllPhotos] = useState<Record<RoutineCategory, string | null>>(emptyPhotos);
@@ -73,6 +76,7 @@ export function LookProvider({ children }: { children: ReactNode }) {
     setProductUri(null);
     setProductUrl(null);
     setZone('lips');
+    setQuality('medium');
   };
 
   const setRoutineAnswers = (category: RoutineCategory, answers: Answers) => {
@@ -97,9 +101,11 @@ export function LookProvider({ children }: { children: ReactNode }) {
         productUri,
         productUrl,
         zone,
+        quality,
         setSelfie,
         setProduct,
         setZone,
+        setQuality,
         resetTryOn,
         routineAnswers,
         routinePhotos,

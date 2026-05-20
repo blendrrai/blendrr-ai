@@ -158,11 +158,17 @@ async function callOpenAIImageEdit(opts: {
 // Task handlers
 // ============================================================================
 
-const ZONE_REGION: Record<string, string> = {
-  lips: 'Only the lip surface (upper and lower lip vertices). Do NOT change lip shape, lip line, philtrum, or the skin around the mouth.',
-  face: 'The ENTIRE face — forehead, temples, cheeks, nose, chin, jawline, the area under the eyes (concealer area), and blending down to the neck. Treat this like applying foundation: even, uniform, full-coverage across the whole face. NOT patches, NOT stripes, NOT just cheeks. The result should look like the person is wearing foundation that has been blended over their entire face. Preserve facial features (eyes, brows, lips, hairline) — apply only to the SKIN surface, not over eyes, lashes, brows, or lips.',
-  hair: 'Only the hair strands themselves. Do NOT change hair shape, length, parting, fly-aways, or the hairline. Recolour while preserving texture.',
-};
+type Zone =
+  | 'lips'
+  | 'foundation'
+  | 'concealer'
+  | 'blush'
+  | 'bronzer'
+  | 'eyeliner'
+  | 'eyeshadow'
+  | 'mascara'
+  | 'eyebrows'
+  | 'hair';
 
 const FINISH_VISUAL: Record<string, string> = {
   matte: 'no shine, soft and powdery, completely flat reflectance',
@@ -220,13 +226,19 @@ Return ONLY this JSON, no preamble:
  * stays the same.
  */
 function buildTryOnPrompt(
-  zone: 'lips' | 'face' | 'hair',
+  zone: Zone,
   hex: string,
   description: string,
   finish: string,
 ): string {
   const header = `You are a professional beauty AI image editor.`;
   const outputStyle = `OUTPUT STYLE:\nUltra realistic beauty campaign / iPhone selfie realism. No glam filters, no AI artifacts, no doll-like skin, no plastic textures. The result should look like a real photo of a real person wearing real makeup.`;
+
+  // Common preservation block — appears in every prompt with minor tweaks.
+  const preserveCommon = `- Preserve the person's exact identity, facial structure, skin tone, skin texture, freckles, moles, hairstyle, lighting, shadows, and camera characteristics.
+- Do NOT beautify the person, smooth the skin, alter facial proportions, or change skin tone.
+- Preserve the original pose, expression, background, framing, crop, aspect ratio, and exact face position within the frame. A user comparing before and after should see the face stay still — only the target region changes.
+- Avoid over-smoothing, AI artifacts, glam filters, or unrealistic skin.`;
 
   if (zone === 'lips') {
     return `${header}
@@ -239,15 +251,187 @@ INPUTS:
 - 1 lipstick product image (the second image — use the lipstick bullet as the colour reference)
 
 INSTRUCTIONS:
-- Preserve the person's exact identity, facial structure, skin tone, skin texture, hairstyle, lighting, shadows, and camera characteristics.
-- Do NOT beautify the person, smooth the skin, alter facial proportions, or change skin tone.
 - Match the lipstick shade from the reference image as accurately as possible. Read the colour from the lipstick bullet itself (the cylindrical wax/cream), NOT the cap, tube, or packaging.
-- The shade is approximately ${hex} (${description}) — use this as a sanity check, but trust the product image as the primary colour source.
-- Apply the lipstick with proper opaque coverage — the natural lip colour must be fully covered. The result should clearly look like worn lipstick, not a sheer tint or wash.
-- Maintain a realistic ${finish} finish that matches the product (matte = flat, no shine; satin = subtle natural sheen; glossy = wet/reflective; shimmer = visible sparkle particles).
-- Apply lipstick ONLY to the lips with realistic edges and natural lip texture. Do NOT change lip shape, lip line, philtrum, or any surrounding skin.
-- Preserve the original pose, expression, background, framing, crop, aspect ratio, and exact face position within the frame. A user comparing before and after should see the face stay still — only the lip colour changes.
-- Avoid over-smoothing, AI artifacts, glam filters, or unrealistic skin.
+- The shade is approximately ${hex} (${description}) — use as a sanity check; trust the product image as the primary colour source.
+- Apply the lipstick with proper opaque coverage — the natural lip colour must be fully covered. The result should clearly look like worn lipstick, not a sheer tint.
+- Maintain a realistic ${finish} finish (matte = flat; satin = subtle sheen; glossy = wet/reflective; shimmer = sparkle particles).
+- Apply ONLY to the lip surface with realistic edges. Do NOT change lip shape, lip line, philtrum, or surrounding skin.
+${preserveCommon}
+
+${outputStyle}`;
+  }
+
+  if (zone === 'foundation') {
+    return `${header}
+
+TASK:
+Apply the foundation from the reference product image onto the person's face in the selfie, naturally and realistically.
+
+INPUTS:
+- 1 selfie image (the first image — this is the canvas you will edit)
+- 1 foundation product image (the second image — use the swatch or actual cream/liquid colour, NOT the bottle or labels)
+
+INSTRUCTIONS:
+- Match the foundation shade from the reference image. The shade is approximately ${hex} (${description}) — use as a sanity check; trust the product image as primary.
+- Apply foundation across the ENTIRE face — forehead, temples, cheeks, nose, chin, jawline, under-eyes, blending down to the neck. NOT in patches, NOT in stripes, NOT just cheeks.
+- Blend naturally into the skin while preserving pores, freckles, moles, and realistic skin texture. Do NOT over-smooth, retouch, or create doll-like skin.
+- Match the product's finish (${finish}: matte = soft/flat, satin = natural smooth, dewy = subtle glow).
+- Apply ONLY to the SKIN. Do NOT cover the eyes, eyelashes, eyebrows, lips, or hairline.
+${preserveCommon}
+
+${outputStyle}`;
+  }
+
+  if (zone === 'concealer') {
+    return `${header}
+
+TASK:
+Apply the concealer from the reference product image to the targeted areas of the person's face — under-eyes, blemishes, dark spots, redness — naturally.
+
+INPUTS:
+- 1 selfie image (the canvas)
+- 1 concealer product image (use the actual cream/liquid colour as the reference)
+
+INSTRUCTIONS:
+- Match the concealer shade from the reference image. Approximately ${hex} (${description}) — use as a sanity check; trust the product image.
+- Apply ONLY to the typical concealer areas: under-eyes (covering any dark circles), the sides of the nose if needed, and any visible blemishes or redness on the face.
+- This is TARGETED application — NOT full-face like foundation. Most of the skin should remain untouched.
+- Blend the edges seamlessly so there are no visible patches or borders. The result should look like flawless natural skin, not painted-on coverage.
+- Match the product's ${finish} finish — natural and skin-like, never cakey.
+- Do NOT cover the eyes themselves, eyelashes, eyebrows, lips, or hairline.
+${preserveCommon}
+
+${outputStyle}`;
+  }
+
+  if (zone === 'blush') {
+    return `${header}
+
+TASK:
+Apply the blush from the reference product image onto the apples of the person's cheeks, naturally and realistically.
+
+INPUTS:
+- 1 selfie image (the canvas)
+- 1 blush product image (powder pan, cream pot, or stick — use the actual pigment colour)
+
+INSTRUCTIONS:
+- Match the blush shade from the reference image. Approximately ${hex} (${description}) — use as a sanity check; trust the product image.
+- Apply ONLY to the apples of the cheeks (the rounded part that lifts when smiling), with a soft diffused edge blending up toward the temples. Optionally a very light touch on the nose tip for a "flushed" look.
+- This is a SOFT WASH of colour — natural flush, not a painted stripe. The colour should look like the person is naturally a little warmed/flushed.
+- Match the product's finish (${finish}: matte = soft powdery flush, satin = natural healthy glow, dewy/glossy = luminous "lit-from-within" effect).
+- Do NOT extend over the eyes, lips, hairline, jaw, or full cheek area. Stay on the apples only.
+${preserveCommon}
+
+${outputStyle}`;
+  }
+
+  if (zone === 'bronzer') {
+    return `${header}
+
+TASK:
+Apply the bronzer from the reference product image to the perimeter of the person's face — temples, top of cheekbones, jawline, sides of the nose — for a sun-kissed warmth.
+
+INPUTS:
+- 1 selfie image (the canvas)
+- 1 bronzer product image (powder pan or stick — use the actual pigment colour)
+
+INSTRUCTIONS:
+- Match the bronzer shade from the reference image. Approximately ${hex} (${description}) — use as a sanity check; trust the product image.
+- Apply to the areas where the sun naturally hits: temples and forehead perimeter, top of the cheekbones (NOT the apples), along the jawline, and a subtle stroke down the sides of the nose. Forms a soft "3" shape on each side of the face.
+- This is a SUBTLE warming, not heavy contour. The result should look like a light tan or healthy sun-kissed glow, not painted-on shadow.
+- Soft, diffused, blended edges — no visible lines.
+- Match the product's finish (${finish}: matte for cleaner warmth, shimmer for a glow).
+- Do NOT cover the centre of the face (forehead centre, nose bridge, apples of cheeks, chin) — that stays the natural skin tone for contrast.
+- Do NOT change lips, eyes, brows, or hair.
+${preserveCommon}
+
+${outputStyle}`;
+  }
+
+  if (zone === 'eyeliner') {
+    return `${header}
+
+TASK:
+Apply the eyeliner from the reference product image along the person's lash lines, naturally and realistically.
+
+INPUTS:
+- 1 selfie image (the canvas)
+- 1 eyeliner product image (pen tip, gel pot, or pencil — use the actual pigment colour)
+
+INSTRUCTIONS:
+- Match the eyeliner shade from the reference image. Approximately ${hex} (${description}) — use as a sanity check; trust the product image.
+- Apply ONLY along the upper lash line (and optionally a thin line on the lower lash line if it matches the product type). Follow the natural eye shape.
+- The line should be crisp, even, and follow the lash line precisely — no shape distortion, no winged extensions beyond the natural eye contour (unless the product is clearly for that and the result still looks like normal makeup).
+- Apply at the product's typical opacity for ${finish} finish.
+- Do NOT change eye shape, eye size, pupil colour, iris colour, eyelash length, or surrounding skin.
+- Do NOT extend the line beyond the outer corner of the eye in a dramatic wing — keep it natural and subtle unless the prompt clearly suggests a wing.
+${preserveCommon}
+
+${outputStyle}`;
+  }
+
+  if (zone === 'eyeshadow') {
+    return `${header}
+
+TASK:
+Apply the eyeshadow from the reference product image onto the person's eyelids, naturally and realistically.
+
+INPUTS:
+- 1 selfie image (the canvas)
+- 1 eyeshadow product image (single pan or palette — use the actual pigment colour)
+
+INSTRUCTIONS:
+- Match the eyeshadow shade from the reference image. Approximately ${hex} (${description}) — use as a sanity check; trust the product image.
+- Apply to the eyelid (lid space from lash line up to the natural crease), with soft blending into the crease and a slight lift toward the outer corner.
+- A subtle touch in the crease and along the lower lash line is fine if it suits the product, but the main concentration is on the lid.
+- This should look like a wearable everyday eyeshadow, not a heavy editorial look — soft, blended, no harsh lines.
+- Match the product's finish (${finish}: matte = soft and flat, shimmer/metallic = catches light, satin = subtle sheen).
+- Do NOT change eye shape, eye size, lash length, brows, or surrounding skin.
+${preserveCommon}
+
+${outputStyle}`;
+  }
+
+  if (zone === 'mascara') {
+    return `${header}
+
+TASK:
+Apply the mascara from the reference product image to the person's eyelashes, lengthening and darkening them naturally.
+
+INPUTS:
+- 1 selfie image (the canvas)
+- 1 mascara product image (tube, wand, or swatch — use the pigment colour, usually black or brown)
+
+INSTRUCTIONS:
+- Match the mascara shade from the reference image. Approximately ${hex} (${description}) — use as a sanity check; trust the product image.
+- Apply ONLY to the eyelashes — upper and lower lashes both visible if present in the source.
+- Lashes should look darker, slightly thicker, and slightly longer/more defined — like a single coat of mascara has been applied. NOT extreme false-lash levels.
+- Preserve the natural lash direction and shape. Do NOT add fake-looking spider lashes, clumps, or cartoon thickness.
+- Match the product's typical look (regular = natural, volumising = thicker, lengthening = longer).
+- Do NOT change eye shape, eye colour, pupil, iris, skin around the eyes, or eyebrows.
+${preserveCommon}
+
+${outputStyle}`;
+  }
+
+  if (zone === 'eyebrows') {
+    return `${header}
+
+TASK:
+Apply the brow product from the reference image to the person's eyebrows, filling and defining them naturally.
+
+INPUTS:
+- 1 selfie image (the canvas)
+- 1 brow product image (pencil, pomade, gel, or powder — use the actual pigment colour)
+
+INSTRUCTIONS:
+- Match the brow product shade from the reference image. Approximately ${hex} (${description}) — use as a sanity check; trust the product image.
+- Fill in sparse areas of the existing eyebrows so they look slightly fuller and more defined. Follow the EXISTING brow shape precisely — do NOT change brow position, arch height, length, or thickness beyond gentle filling.
+- The result should look like the person has neatly groomed brows with a little extra colour — not drawn-on cartoon brows.
+- Match the product's finish (${finish}: pencil = soft hair-like strokes, pomade = defined, gel = brushed-up and held).
+- Do NOT change eye shape, lashes, skin tone, or any other facial feature.
+- Do NOT extend the brows beyond their natural start and end points.
+${preserveCommon}
 
 ${outputStyle}`;
   }
@@ -259,50 +443,33 @@ TASK:
 Apply the hair colour from the reference product image onto the person's hair in the selfie, naturally and realistically.
 
 INPUTS:
-- 1 selfie image (the first image — this is the canvas you will edit)
-- 1 hair colour product image (the second image — use the colour swatch or sample as the reference)
+- 1 selfie image (the canvas)
+- 1 hair colour product image (use the colour swatch or sample as the reference)
 
 INSTRUCTIONS:
-- Preserve the person's exact identity, facial features, skin, hairstyle shape, hair length, parting, hairline, lighting, shadows, and camera characteristics.
-- Do NOT change hair shape, length, parting, fly-aways, or hairline position. Only recolour the existing hair.
 - Match the hair colour from the reference image as accurately as possible.
-- The shade is approximately ${hex} (${description}) — use this as a sanity check, but trust the product image as the primary colour source.
-- Recolour the hair while preserving natural strand texture, highlights, lowlights, and the dimensional colour variation that real hair has. Do NOT make the hair look flat, painted, or like a solid colour block.
+- The shade is approximately ${hex} (${description}) — use as a sanity check; trust the product image.
+- Recolour the hair while preserving natural strand texture, highlights, lowlights, and dimensional colour variation that real hair has. Do NOT make the hair look flat, painted, or like a solid colour block.
+- Do NOT change hair shape, length, parting, fly-aways, or hairline position.
 - Apply ONLY to hair strands. Do NOT change face, skin, eyebrows, eyelashes, or background.
-- Preserve the original pose, expression, background, framing, crop, aspect ratio, and exact face position within the frame.
-- Avoid AI artifacts, plastic-looking hair, or unrealistic uniform colour.
+${preserveCommon}
 
 ${outputStyle}`;
   }
 
-  // zone === 'face' — currently treated as foundation. When face is split into
-  // sub-zones (blush, concealer, contour, bronzer), each becomes its own
-  // branch above with tailored INSTRUCTIONS.
-  return `${header}
-
-TASK:
-Apply the foundation from the reference product image onto the person's face in the selfie, naturally and realistically.
-
-INPUTS:
-- 1 selfie image (the first image — this is the canvas you will edit)
-- 1 foundation product image (the second image — use the foundation swatch or product surface as the colour reference)
-
-INSTRUCTIONS:
-- Preserve the person's exact identity, facial structure, facial features, hairstyle, lighting, shadows, and camera characteristics.
-- Do NOT beautify the person, alter facial proportions, change face shape, or change features.
-- Match the foundation shade from the reference image as accurately as possible. Read the colour from the actual foundation swatch / cream / liquid, NOT the bottle, cap, or labels.
-- The shade is approximately ${hex} (${description}) — use this as a sanity check, but trust the product image as the primary colour source.
-- Apply foundation across the ENTIRE face — forehead, temples, cheeks, nose, chin, jawline, the area under the eyes, and blend down to the neck. NOT in patches, NOT in stripes, NOT just on the cheeks.
-- Blend foundation naturally into the skin while preserving pores, freckles, moles, and realistic skin texture. Do NOT over-smooth, retouch, or create doll-like skin.
-- Match the product's finish (${finish}: matte = soft/flat, satin = natural smooth, dewy = subtle glow).
-- Apply ONLY to the SKIN. Do NOT cover the eyes, eyelashes, eyebrows, lips, or hairline.
-- Preserve the original pose, expression, background, framing, crop, aspect ratio, and exact face position within the frame.
-- Avoid over-smoothing, AI artifacts, glam filters, or unrealistic skin.
-
-${outputStyle}`;
+  // Exhaustiveness fallback — shouldn't be reached with valid Zone type.
+  throw new Error(`Unknown zone: ${zone}`);
 }
 
-async function handleTryOn(payload: { selfieImage: string; productImage: string; zone: 'lips' | 'face' | 'hair' }) {
+async function handleTryOn(payload: {
+  selfieImage: string;
+  productImage: string;
+  zone: Zone;
+  quality?: 'medium' | 'ultra';
+}) {
+  const quality: 'medium' | 'ultra' = payload.quality === 'ultra' ? 'ultra' : 'medium';
+  const openAIQuality: 'medium' | 'high' = quality === 'ultra' ? 'high' : 'medium';
+
   // Step 1: describe shade (Gemini text-vision — still good at this)
   let shade;
   try {
@@ -329,16 +496,15 @@ async function handleTryOn(payload: { selfieImage: string; productImage: string;
   let imageBase64: string | null = null;
   let lastError: string | null = null;
 
-  // Attempt 1: OpenAI gpt-image-2 (primary). Quality 'medium' is the sweet
-  // spot: ~75% cheaper than 'high' (£0.05 vs £0.13 per call) and 50% faster
-  // (~20s vs 50s), with quality drop barely perceptible — the dramatic jump
-  // was Gemini → OpenAI, not medium → high.
+  // Attempt 1: OpenAI gpt-image-2 (primary). Quality routed from user choice:
+  //   ultra → openai 'high' (~£0.13, ~50s, sharpest result)
+  //   medium → openai 'medium' (~£0.05, ~20s, good for browsing)
   try {
-    console.log(`[try-on] attempt 1: openai ${OPENAI_IMAGE_MODEL} (medium)`);
+    console.log(`[try-on] attempt 1: openai ${OPENAI_IMAGE_MODEL} (${openAIQuality})`);
     imageBase64 = await callOpenAIImageEdit({
       model: OPENAI_IMAGE_MODEL,
       prompt: openAIPrompt,
-      quality: 'medium',
+      quality: openAIQuality,
       images: [
         { data: payload.selfieImage, mime: 'image/jpeg' },
         { data: payload.productImage, mime: 'image/jpeg' },
@@ -359,11 +525,11 @@ async function handleTryOn(payload: { selfieImage: string; productImage: string;
   );
   if (!imageBase64 && modelUnavailable) {
     try {
-      console.log(`[try-on] attempt 2: openai ${OPENAI_IMAGE_FALLBACK} (medium)`);
+      console.log(`[try-on] attempt 2: openai ${OPENAI_IMAGE_FALLBACK} (${openAIQuality})`);
       imageBase64 = await callOpenAIImageEdit({
         model: OPENAI_IMAGE_FALLBACK,
         prompt: openAIPrompt,
-        quality: 'medium',
+        quality: openAIQuality,
         images: [
           { data: payload.selfieImage, mime: 'image/jpeg' },
           { data: payload.productImage, mime: 'image/jpeg' },
@@ -410,6 +576,7 @@ async function handleTryOn(payload: { selfieImage: string; productImage: string;
   return {
     imageBase64,
     shade,
+    quality,
   };
 }
 
@@ -693,7 +860,14 @@ serve(async (req) => {
       .single();
 
     if (userError || !user) return json({ error: 'User not found' }, 401);
-    if (user.credits <= 0) return json({ error: 'Out of credits', credits: 0 }, 402);
+
+    // Variable credit cost: try-on at ultra quality costs 2, everything else costs 1.
+    const isUltraTryOn = task === 'try-on' && payload?.quality === 'ultra';
+    const creditCost = isUltraTryOn ? 2 : 1;
+
+    if (user.credits < creditCost) {
+      return json({ error: 'Out of credits', credits: user.credits, required: creditCost }, 402);
+    }
 
     // Dispatch
     let result: unknown;
@@ -723,15 +897,20 @@ serve(async (req) => {
         return json({ error: `Unknown task: ${task}` }, 400);
     }
 
-    // Deduct credit on success
+    // Deduct credits on success (variable: 1 for standard, 2 for ultra try-on)
     const { data: updated } = await supabase
       .from('users')
-      .update({ credits: user.credits - 1 })
+      .update({ credits: user.credits - creditCost })
       .eq('id', userId)
       .select('credits, tier')
       .single();
 
-    return json({ result, credits: updated?.credits ?? user.credits - 1, tier: updated?.tier ?? user.tier });
+    return json({
+      result,
+      credits: updated?.credits ?? user.credits - creditCost,
+      tier: updated?.tier ?? user.tier,
+      creditsCharged: creditCost,
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error';
     const status = (e as { status?: number })?.status ?? 500;

@@ -1,0 +1,200 @@
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { Check, Sparkles, Wand2, Zap } from 'lucide-react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
+import type { ComponentType } from 'react';
+import { Screen } from '../components/Screen';
+import { StepHeader } from '../components/StepHeader';
+import { Button } from '../components/Button';
+import { colors, radius, shadow, spacing, type } from '../lib/theme';
+import type { Quality } from '../lib/theme';
+import { useLook } from '../lib/state';
+
+type IconProps = { size: number; color: string; strokeWidth: number };
+
+type Option = {
+  value: Quality;
+  label: string;
+  credits: number;
+  duration: string;
+  Icon: ComponentType<IconProps>;
+  description: string;
+  bestFor: string;
+};
+
+const OPTIONS: Option[] = [
+  {
+    value: 'medium',
+    label: 'Standard',
+    credits: 1,
+    duration: '15–30 seconds',
+    Icon: Zap,
+    description: 'Fast preview. Good enough to see how a shade looks on you while browsing.',
+    bestFor: 'Best for: browsing, scrolling, trying lots of products quickly.',
+  },
+  {
+    value: 'ultra',
+    label: 'Ultra HD',
+    credits: 2,
+    duration: '40 seconds – 1 minute',
+    Icon: Sparkles,
+    description: 'Pixel-perfect shade match with sharper detail. Worth the extra time when you are about to commit.',
+    bestFor: 'Best for: deciding whether to actually buy the product.',
+  },
+];
+
+export default function QualityPicker() {
+  const { quality, setQuality } = useLook();
+
+  return (
+    <Screen>
+      <StepHeader
+        step="Step 4 of 4"
+        title="How sharp should it be?"
+        subtitle="Pick a quality. You can change this on every try-on."
+      />
+
+      <ScrollView
+        style={styles.body}
+        contentContainerStyle={styles.bodyContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {OPTIONS.map((opt) => (
+          <QualityCard
+            key={opt.value}
+            option={opt}
+            selected={quality === opt.value}
+            onPress={() => setQuality(opt.value)}
+          />
+        ))}
+      </ScrollView>
+
+      <View style={styles.cta}>
+        <Button
+          label={quality === 'ultra' ? 'Visualize · 2 credits' : 'Visualize · 1 credit'}
+          onPress={() => router.push('/result')}
+          trailing={<Wand2 size={20} color={colors.primaryOn} strokeWidth={2.2} />}
+        />
+      </View>
+    </Screen>
+  );
+}
+
+function QualityCard({
+  option,
+  selected,
+  onPress,
+}: {
+  option: Option;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const scale = useSharedValue(1);
+  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+  return (
+    <AnimatedPressable
+      onPress={onPress}
+      onPressIn={() => {
+        scale.value = withSpring(0.98, { damping: 18, stiffness: 260 });
+      }}
+      onPressOut={() => {
+        scale.value = withSpring(1, { damping: 14, stiffness: 220 });
+      }}
+      style={[styles.card, shadow.card, selected && styles.cardSelected, animStyle]}
+    >
+      <View style={styles.cardHeader}>
+        <View style={[styles.iconRing, selected && styles.iconRingSelected]}>
+          <option.Icon
+            size={22}
+            color={selected ? colors.primaryOn : colors.primary}
+            strokeWidth={1.8}
+          />
+        </View>
+        <View style={styles.cardHeaderText}>
+          <View style={styles.titleRow}>
+            <Text style={styles.cardTitle}>{option.label}</Text>
+            <View style={styles.creditPill}>
+              <Text style={styles.creditPillText}>
+                {option.credits} {option.credits === 1 ? 'credit' : 'credits'}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.duration}>{option.duration}</Text>
+        </View>
+        {selected && (
+          <View style={styles.selectedBadge}>
+            <Check size={14} color={colors.primaryOn} strokeWidth={2.6} />
+          </View>
+        )}
+      </View>
+
+      <Text style={styles.description}>{option.description}</Text>
+      <Text style={styles.bestFor}>{option.bestFor}</Text>
+    </AnimatedPressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  body: { flex: 1 },
+  bodyContent: { paddingVertical: spacing.sm, paddingBottom: spacing.xl, gap: spacing.md },
+  card: {
+    backgroundColor: colors.bgSoft,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    gap: spacing.sm,
+  },
+  cardSelected: {
+    borderColor: colors.primary,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  iconRing: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  iconRingSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  cardHeaderText: { flex: 1, gap: 2 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  cardTitle: { ...type.heading, fontSize: 17, color: colors.text },
+  creditPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  creditPillText: { ...type.caption, color: colors.text, fontWeight: '700', fontSize: 11 },
+  duration: { ...type.caption, color: colors.textMuted, fontSize: 12 },
+  selectedBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  description: { ...type.body, fontSize: 14, color: colors.text, lineHeight: 20 },
+  bestFor: { ...type.caption, color: colors.textMuted, fontSize: 12, fontStyle: 'italic' },
+  cta: { paddingBottom: spacing.lg },
+});

@@ -114,6 +114,7 @@ export type TryOnInput = {
   selfieUri: string;
   productUri: string;
   zone: Zone;
+  quality?: 'medium' | 'ultra';
 };
 
 type ShadeInfo = {
@@ -122,15 +123,16 @@ type ShadeInfo = {
   finish: string;
 };
 
-export async function tryOn({ selfieUri, productUri, zone }: TryOnInput): Promise<string> {
+export async function tryOn({ selfieUri, productUri, zone, quality = 'medium' }: TryOnInput): Promise<string> {
   const [selfieImage, productImage] = await Promise.all([
     uriToBase64(selfieUri, 1024),
     uriToBase64(productUri, 1024),
   ]);
-  const result = await callEdge<{ imageBase64: string; shade: ShadeInfo }>('try-on', {
+  const result = await callEdge<{ imageBase64: string; shade: ShadeInfo; quality: 'medium' | 'ultra' }>('try-on', {
     selfieImage,
     productImage,
     zone,
+    quality,
   });
   return writeImageToDisk(result.imageBase64, 'tryon');
 }
