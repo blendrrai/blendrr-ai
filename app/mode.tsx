@@ -1,6 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { Check, Sparkles, Wand2, Zap } from 'lucide-react-native';
+import { ArrowRight, Check, Layers, Sparkle } from 'lucide-react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -11,54 +11,48 @@ import { Screen } from '../components/Screen';
 import { StepHeader } from '../components/StepHeader';
 import { Button } from '../components/Button';
 import { colors, radius, shadow, spacing, type } from '../lib/theme';
-import type { Quality } from '../lib/theme';
+import type { Mode } from '../lib/theme';
 import { useLook } from '../lib/state';
 
 type IconProps = { size: number; color: string; strokeWidth: number };
 
 type Option = {
-  value: Quality;
+  value: Mode;
   label: string;
   credits: number;
-  duration: string;
   Icon: ComponentType<IconProps>;
   description: string;
   bestFor: string;
 };
 
-type OptionWithBadge = Option & { recommended?: boolean };
-
-const OPTIONS: OptionWithBadge[] = [
+const OPTIONS: Option[] = [
   {
-    value: 'medium',
-    label: 'Standard',
+    value: 'single',
+    label: 'Single product',
     credits: 1,
-    duration: '15–30 seconds',
-    Icon: Zap,
-    description: 'Fast preview. Good enough to see how a shade looks on you while browsing.',
-    bestFor: 'Best for: browsing, scrolling, trying lots of products quickly.',
+    Icon: Sparkle,
+    description: 'Try one product at a time on a specific area — lipstick on lips, foundation on skin, eyeshadow on lids.',
+    bestFor: 'Best for: testing a specific shade you found online.',
   },
   {
-    value: 'ultra',
-    label: 'Ultra HD',
+    value: 'multi',
+    label: 'Full face',
     credits: 2,
-    duration: '40 seconds – 1 minute',
-    Icon: Sparkles,
-    description: 'Pixel-perfect shade match with sharper detail. Worth the extra time when you are about to commit.',
-    bestFor: 'Best for: deciding whether to actually buy the product.',
-    recommended: true,
+    Icon: Layers,
+    description: 'Layer up to 5 products in one go for a complete makeup look — foundation, lipstick, blush, the works.',
+    bestFor: 'Best for: planning a full glam look before going out.',
   },
 ];
 
-export default function QualityPicker() {
-  const { quality, setQuality } = useLook();
+export default function ModeStep() {
+  const { mode, setMode } = useLook();
 
   return (
     <Screen>
       <StepHeader
-        step="Step 5 of 5"
-        title="How sharp should it be?"
-        subtitle="Pick a quality. You can change this on every try-on."
+        step="Step 2 of 5"
+        title="How much are you trying on?"
+        subtitle="One product, or a whole look?"
       />
 
       <ScrollView
@@ -67,32 +61,37 @@ export default function QualityPicker() {
         showsVerticalScrollIndicator={false}
       >
         {OPTIONS.map((opt) => (
-          <QualityCard
+          <ModeCard
             key={opt.value}
             option={opt}
-            selected={quality === opt.value}
-            onPress={() => setQuality(opt.value)}
+            selected={mode === opt.value}
+            onPress={() => setMode(opt.value)}
           />
         ))}
       </ScrollView>
 
       <View style={styles.cta}>
         <Button
-          label="Visualize"
-          onPress={() => router.push('/result')}
-          trailing={<Wand2 size={20} color={colors.primaryOn} strokeWidth={2.2} />}
+          label="Continue"
+          onPress={() => {
+            // Single product → pick a specific zone next.
+            // Multi (full face) → skip zone screen; the AI figures out where each
+            // product goes based on the product image (lipstick → lips, etc.).
+            router.push(mode === 'single' ? '/zone' : '/product');
+          }}
+          trailing={<ArrowRight size={20} color={colors.primaryOn} strokeWidth={2.2} />}
         />
       </View>
     </Screen>
   );
 }
 
-function QualityCard({
+function ModeCard({
   option,
   selected,
   onPress,
 }: {
-  option: OptionWithBadge;
+  option: Option;
   selected: boolean;
   onPress: () => void;
 }) {
@@ -111,11 +110,6 @@ function QualityCard({
       }}
       style={[styles.card, shadow.card, selected && styles.cardSelected, animStyle]}
     >
-      {option.recommended && (
-        <View style={styles.recommendedPill}>
-          <Text style={styles.recommendedText}>Recommended</Text>
-        </View>
-      )}
       <View style={styles.cardHeader}>
         <View style={[styles.iconRing, selected && styles.iconRingSelected]}>
           <option.Icon
@@ -133,7 +127,6 @@ function QualityCard({
               </Text>
             </View>
           </View>
-          <Text style={styles.duration}>{option.duration}</Text>
         </View>
         {selected && (
           <View style={styles.selectedBadge}>
@@ -158,34 +151,9 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.border,
     gap: spacing.sm,
-    position: 'relative',
   },
-  recommendedPill: {
-    position: 'absolute',
-    top: -10,
-    right: spacing.md,
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-    zIndex: 1,
-  },
-  recommendedText: {
-    ...type.caption,
-    color: colors.primaryOn,
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  cardSelected: {
-    borderColor: colors.primary,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
+  cardSelected: { borderColor: colors.primary },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   iconRing: {
     width: 44,
     height: 44,
@@ -196,10 +164,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  iconRingSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
+  iconRingSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
   cardHeaderText: { flex: 1, gap: 2 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   cardTitle: { ...type.heading, fontSize: 17, color: colors.text },
@@ -212,7 +177,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   creditPillText: { ...type.caption, color: colors.text, fontWeight: '700', fontSize: 11 },
-  duration: { ...type.caption, color: colors.textMuted, fontSize: 12 },
   selectedBadge: {
     width: 26,
     height: 26,

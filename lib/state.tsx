@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
-import type { Quality, Zone } from './theme';
+import type { Mode, Quality, Zone } from './theme';
 import type { Answers } from '../components/Questionnaire';
 import {
   saveRoutineAnswers as persistAnswers,
@@ -9,13 +9,24 @@ import {
 
 type LookState = {
   selfieUri: string | null;
-  productUri: string | null;
-  productUrl: string | null;
+  /** All product images for the current try-on. Length 1 for single, up to 5 for multi. */
+  productUris: string[];
+  /** Parallel array of source URLs (or nulls if uploaded directly). */
+  productUrls: (string | null)[];
   zone: Zone;
+  mode: Mode;
   quality: Quality;
   setSelfie: (uri: string | null) => void;
-  setProduct: (uri: string | null, sourceUrl?: string | null) => void;
+  /** Add a product to the list. Replaces if single mode. */
+  addProduct: (uri: string, sourceUrl?: string | null) => void;
+  /** Remove the product at index. */
+  removeProduct: (index: number) => void;
+  /** Replace a specific product at index. */
+  replaceProduct: (index: number, uri: string, sourceUrl?: string | null) => void;
+  /** Set the entire products array (used by mode transitions). */
+  setProducts: (uris: string[], urls?: (string | null)[]) => void;
   setZone: (zone: Zone) => void;
+  setMode: (mode: Mode) => void;
   setQuality: (quality: Quality) => void;
   resetTryOn: () => void;
 
@@ -50,9 +61,10 @@ const emptyPhotos: Record<RoutineCategory, string | null> = {
 
 export function LookProvider({ children }: { children: ReactNode }) {
   const [selfieUri, setSelfie] = useState<string | null>(null);
-  const [productUri, setProductUri] = useState<string | null>(null);
-  const [productUrl, setProductUrl] = useState<string | null>(null);
+  const [productUris, setProductUris] = useState<string[]>([]);
+  const [productUrls, setProductUrls] = useState<(string | null)[]>([]);
   const [zone, setZone] = useState<Zone>('lips');
+  const [mode, setModeState] = useState<Mode>('single');
   const [quality, setQuality] = useState<Quality>('medium');
 
   const [routineAnswers, setAllAnswers] = useState<Record<RoutineCategory, Answers>>(emptyAnswers);
@@ -66,16 +78,46 @@ export function LookProvider({ children }: { children: ReactNode }) {
     setIngredientText('');
   };
 
-  const setProduct = (uri: string | null, sourceUrl?: string | null) => {
-    setProductUri(uri);
-    setProductUrl(sourceUrl ?? null);
+  const addProduct = (uri: string, sourceUrl?: string | null) => {
+    if (mode === 'single') {
+      setProductUris([uri]);
+      setProductUrls([sourceUrl ?? null]);
+      return;
+    }
+    setProductUris((prev) => [...prev, uri].slice(0, 5));
+    setProductUrls((prev) => [...prev, sourceUrl ?? null].slice(0, 5));
+  };
+
+  const removeProduct = (index: number) => {
+    setProductUris((prev) => prev.filter((_, i) => i !== index));
+    setProductUrls((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const replaceProduct = (index: number, uri: string, sourceUrl?: string | null) => {
+    setProductUris((prev) => prev.map((p, i) => (i === index ? uri : p)));
+    setProductUrls((prev) => prev.map((p, i) => (i === index ? (sourceUrl ?? null) : p)));
+  };
+
+  const setProducts = (uris: string[], urls?: (string | null)[]) => {
+    setProductUris(uris);
+    setProductUrls(urls ?? uris.map(() => null));
+  };
+
+  const setMode = (next: Mode) => {
+    setModeState(next);
+    // Switching to single mode? Trim to 1 product.
+    if (next === 'single' && productUris.length > 1) {
+      setProductUris((prev) => prev.slice(0, 1));
+      setProductUrls((prev) => prev.slice(0, 1));
+    }
   };
 
   const resetTryOn = () => {
     setSelfie(null);
-    setProductUri(null);
-    setProductUrl(null);
+    setProductUris([]);
+    setProductUrls([]);
     setZone('lips');
+    setModeState('single');
     setQuality('medium');
   };
 
@@ -98,13 +140,18 @@ export function LookProvider({ children }: { children: ReactNode }) {
     <LookContext.Provider
       value={{
         selfieUri,
-        productUri,
-        productUrl,
+        productUris,
+        productUrls,
         zone,
+        mode,
         quality,
         setSelfie,
-        setProduct,
+        addProduct,
+        removeProduct,
+        replaceProduct,
+        setProducts,
         setZone,
+        setMode,
         setQuality,
         resetTryOn,
         routineAnswers,

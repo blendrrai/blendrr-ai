@@ -24,7 +24,7 @@ export default function ZoneStep() {
   return (
     <Screen>
       <StepHeader
-        step="Step 3 of 4"
+        step="Step 3 of 5"
         title="What are you trying on?"
         subtitle="Pick the product type so we can apply it to the right spot."
       />
@@ -48,7 +48,7 @@ export default function ZoneStep() {
       <View style={styles.cta}>
         <Button
           label="Continue"
-          onPress={() => router.push('/quality')}
+          onPress={() => router.push('/product')}
           trailing={<ArrowRight size={20} color={colors.primaryOn} strokeWidth={2.2} />}
         />
       </View>

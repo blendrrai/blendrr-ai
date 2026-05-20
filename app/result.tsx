@@ -21,7 +21,7 @@ type State =
   | { kind: 'no-credits'; reason: string };
 
 export default function ResultScreen() {
-  const { selfieUri, productUri, productUrl, zone, quality, resetTryOn } = useLook();
+  const { selfieUri, productUris, productUrls, zone, mode, quality, resetTryOn } = useLook();
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [view, setView] = useState<'before' | 'after'>('after');
   const [saving, setSaving] = useState(false);
@@ -30,9 +30,12 @@ export default function ResultScreen() {
   const [addedToWishlist, setAddedToWishlist] = useState(false);
   const inFlight = useRef(false);
 
+  const productUri = productUris[0] ?? null;
+  const productUrl = productUrls[0] ?? null;
+
   const run = useCallback(async () => {
     if (inFlight.current) return;
-    if (!selfieUri || !productUri) {
+    if (!selfieUri || productUris.length === 0) {
       setState({ kind: 'error', message: 'Missing selfie or product image.' });
       return;
     }
@@ -47,15 +50,19 @@ export default function ResultScreen() {
     }
 
     try {
-      const resultUri = await tryOn({ selfieUri, productUri, zone, quality });
+      const resultUri = await tryOn({ selfieUri, productUris, zone, mode, quality });
       await consumeCreditWithPrompt();
       await saveTryOn({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         createdAt: Date.now(),
         zone,
         selfieUri,
-        productUri,
-        productUrl,
+        productUri: productUris[0],
+        productUris,
+        productUrl: productUrls[0] ?? null,
+        productUrls,
+        mode,
+        quality,
         resultUri,
       });
       setState({ kind: 'ok', uri: resultUri });
@@ -66,7 +73,7 @@ export default function ResultScreen() {
     } finally {
       inFlight.current = false;
     }
-  }, [selfieUri, productUri, productUrl, zone, quality]);
+  }, [selfieUri, productUris, productUrls, zone, mode, quality]);
 
   useEffect(() => {
     run();

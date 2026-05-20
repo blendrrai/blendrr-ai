@@ -112,8 +112,12 @@ function writeImageToDisk(base64: string, prefix: string): string {
 
 export type TryOnInput = {
   selfieUri: string;
-  productUri: string;
+  /** One product for single mode, up to 5 for multi mode. */
+  productUris: string[];
+  /** Zone of the single product (ignored / unused in multi mode). */
   zone: Zone;
+  /** 'single' = one product, one zone. 'multi' = full-face, up to 5 products, AI figures out where each goes. */
+  mode: 'single' | 'multi';
   quality?: 'medium' | 'ultra';
 };
 
@@ -123,17 +127,45 @@ type ShadeInfo = {
   finish: string;
 };
 
-export async function tryOn({ selfieUri, productUri, zone, quality = 'medium' }: TryOnInput): Promise<string> {
-  const [selfieImage, productImage] = await Promise.all([
+export async function tryOn({
+  selfieUri,
+  productUris,
+  zone,
+  mode,
+  quality = 'medium',
+}: TryOnInput): Promise<string> {
+  if (productUris.length === 0) throw new Error('Add at least one product.');
+
+  const [selfieImage, ...productImages] = await Promise.all([
     uriToBase64(selfieUri, 1024),
-    uriToBase64(productUri, 1024),
+    ...productUris.map((uri) => uriToBase64(uri, 1024)),
   ]);
-  const result = await callEdge<{ imageBase64: string; shade: ShadeInfo; quality: 'medium' | 'ultra' }>('try-on', {
+
+  // Server still accepts `productImage` (singular) for back-compat with the
+  // existing single-mode path. For multi we send the array as `productImages`.
+  const payload: {
+    selfieImage: string;
+    productImage?: string;
+    productImages?: string[];
+    zone: Zone;
+    mode: 'single' | 'multi';
+    quality: 'medium' | 'ultra';
+  } = {
     selfieImage,
-    productImage,
     zone,
+    mode,
     quality,
-  });
+  };
+  if (mode === 'single') {
+    payload.productImage = productImages[0];
+  } else {
+    payload.productImages = productImages;
+  }
+
+  const result = await callEdge<{ imageBase64: string; shade: ShadeInfo | null; quality: 'medium' | 'ultra' }>(
+    'try-on',
+    payload,
+  );
   return writeImageToDisk(result.imageBase64, 'tryon');
 }
 

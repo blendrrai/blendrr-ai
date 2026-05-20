@@ -9,8 +9,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
-const INVITEE_REWARD = 5;
-const INVITER_REWARD = 3;
+// 1 credit each side. Was 5/3 — too pricey when each try-on can cost up to
+// 3 credits worth of API calls and referrals can chain.
+const INVITEE_REWARD = 1;
+const INVITER_REWARD = 1;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

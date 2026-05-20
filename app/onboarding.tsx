@@ -118,7 +118,7 @@ export default function Onboarding() {
     if (result.ok) {
       Alert.alert(
         'Code applied 🎉',
-        `+${result.reward} credits added. You're all set.`,
+        "Free credits added. You're all set.",
         [{ text: 'Continue', onPress: finish }],
       );
     } else {
@@ -194,7 +194,7 @@ export default function Onboarding() {
                       style={styles.referralInput}
                     />
                     <Text style={styles.referralHelper}>
-                      +5 credits for you, +3 for them. Optional — skip if you don't have one.
+                      Free credits for you and your friend. Optional — skip if you don't have one.
                     </Text>
                   </View>
                 )}

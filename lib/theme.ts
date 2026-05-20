@@ -98,7 +98,26 @@ export const ZONES_BY_CATEGORY: Record<ZoneCategory, Zone[]> = {
 
 export type Quality = 'medium' | 'ultra';
 
+/**
+ * Per-screen "shown" credit cost — what the user sees on the picker UI.
+ * The actual total deducted is computed in the Edge Function:
+ *   total = 1 + (multi ? 1 : 0) + (ultra ? 1 : 0)
+ * So combinations are:
+ *   single + medium = 1   single + ultra = 2
+ *   multi  + medium = 2   multi  + ultra = 3
+ * Picker labels show the per-option cost in isolation per user request:
+ * "Don't tally these up". Users see 1/2 on each screen.
+ */
 export const qualityCost: Record<Quality, number> = {
   medium: 1,
   ultra: 2,
 };
+
+export type Mode = 'single' | 'multi';
+
+export const modeCost: Record<Mode, number> = {
+  single: 1,
+  multi: 2,
+};
+
+export const MAX_PRODUCTS_MULTI = 5;

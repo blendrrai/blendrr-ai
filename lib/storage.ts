@@ -26,8 +26,16 @@ export type TryOn = {
   createdAt: number;
   zone: Zone;
   selfieUri: string;
+  /** Primary product (first in array). Kept for back-compat with old records. */
   productUri: string;
+  /** All products that went into this try-on. Length 1 for single, up to 5 for multi. */
+  productUris?: string[];
   productUrl: string | null;
+  productUrls?: (string | null)[];
+  /** Set when the try-on used multi mode. Missing on old records. */
+  mode?: 'single' | 'multi';
+  /** Quality tier used. Missing on old records. */
+  quality?: 'medium' | 'ultra';
   resultUri: string | null;
 };
 

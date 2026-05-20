@@ -18,7 +18,7 @@ import type { ComponentType } from 'react';
 type Tab = 'try-ons' | 'analyses';
 
 export default function HistoryScreen() {
-  const { setSelfie, setProduct, setZone } = useLook();
+  const { setSelfie, setProducts, setZone, setMode } = useLook();
   const [tryOns, setTryOns] = useState<TryOn[]>([]);
   const [analyses, setAnalyses] = useState<AnalysisRecord[]>([]);
   const [tab, setTab] = useState<Tab>('try-ons');
@@ -33,8 +33,11 @@ export default function HistoryScreen() {
           text: 'Try again',
           onPress: () => {
             setSelfie(null);
-            setProduct(item.productUri, item.productUrl);
+            const uris = item.productUris ?? [item.productUri];
+            const urls = item.productUrls ?? [item.productUrl];
+            setProducts(uris, urls);
             setZone(item.zone);
+            setMode(item.mode ?? 'single');
             router.push('/selfie');
           },
         },

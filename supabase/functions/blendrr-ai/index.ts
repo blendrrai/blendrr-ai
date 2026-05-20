@@ -461,36 +461,90 @@ ${outputStyle}`;
   throw new Error(`Unknown zone: ${zone}`);
 }
 
+/**
+ * Build the full-face multi-product prompt for OpenAI.
+ * The selfie is image 1; subsequent images (2..N) are makeup products. The AI
+ * identifies what each product is (lipstick, foundation, blush, etc.) and
+ * applies each to its appropriate area on the face.
+ */
+function buildMultiTryOnPrompt(productCount: number): string {
+  return `You are a professional beauty AI image editor.
+
+TASK:
+Apply a complete makeup look to the person in the selfie. The selfie is the FIRST image. The next ${productCount} image${productCount === 1 ? '' : 's'} ${productCount === 1 ? 'is' : 'are'} makeup products — identify what each one is (lipstick, foundation, concealer, blush, bronzer, eyeshadow, eyeliner, mascara, eyebrow product, etc.) and apply each to its appropriate area on the face.
+
+INPUTS:
+- Image 1: a portrait selfie (this is the canvas you will edit)
+- Images 2–${productCount + 1}: makeup products (foundation/lipstick/blush/etc. — figure out what each one is from the image)
+
+INSTRUCTIONS:
+- For each product in images 2–${productCount + 1}, identify what type of makeup it is and apply it to the correct area:
+  • Lipstick → lips (opaque coverage, the lipstick's exact colour, matte/satin/gloss as appropriate)
+  • Foundation → entire face, blended naturally over the skin, preserving texture
+  • Concealer → under-eyes and any visible blemishes (targeted, not full-face)
+  • Blush → apples of the cheeks (soft diffused wash)
+  • Bronzer → temples, top of cheekbones, jawline (subtle warmth, not heavy contour)
+  • Eyeshadow → eyelids (lid space, with soft blending into the crease)
+  • Eyeliner → along the lash line
+  • Mascara → eyelashes (darken and slightly define, not extreme)
+  • Eyebrow product → fill in brows following existing shape
+  • Hair colour → hair strands only
+- Match each product's exact colour from its image. Read the colour from the actual product (lipstick bullet, swatch, cream, powder) — NOT the cap, tube, label, or packaging.
+- Apply each product realistically and proportionately. The full look should feel cohesive and wearable, like real makeup done by a professional — not a stage look.
+- Preserve the person's identity, facial structure, skin texture, freckles, moles, hairstyle (unless hair colour was a product), lighting, shadows, and background. Do NOT beautify, smooth, alter proportions, or change skin tone (foundation aside).
+- Preserve the original pose, expression, framing, crop, aspect ratio, and exact face position. A user comparing before and after should see the face stay still — only the applied makeup should differ.
+- Avoid AI artifacts, glam filters, doll-like skin, painted-on edges, or anything that looks unnatural.
+
+OUTPUT STYLE:
+Ultra realistic beauty campaign / iPhone selfie realism. No glam filters, no AI artifacts, no doll-like skin, no plastic textures. The result should look like a real photo of a real person wearing real makeup that they've applied themselves.`;
+}
+
 async function handleTryOn(payload: {
   selfieImage: string;
-  productImage: string;
+  productImage?: string;
+  productImages?: string[];
   zone: Zone;
+  mode?: 'single' | 'multi';
   quality?: 'medium' | 'ultra';
 }) {
+  const mode: 'single' | 'multi' = payload.mode === 'multi' ? 'multi' : 'single';
   const quality: 'medium' | 'ultra' = payload.quality === 'ultra' ? 'ultra' : 'medium';
   const openAIQuality: 'medium' | 'high' = quality === 'ultra' ? 'high' : 'medium';
 
-  // Step 1: describe shade (Gemini text-vision — still good at this)
-  let shade;
-  try {
-    shade = await handleDescribeShade({ productImage: payload.productImage, zone: payload.zone });
-  } catch {
-    throw new Error("Couldn't read the shade from that product image. Try a clearer photo or swatch.");
+  // Collect product images. Single mode = 1; multi mode = N (up to 5).
+  const productImages: string[] = mode === 'single'
+    ? (payload.productImage ? [payload.productImage] : [])
+    : (payload.productImages ?? []);
+
+  if (productImages.length === 0) {
+    throw new Error('No product image provided.');
   }
-  if (!shade?.hex || !/^#?[0-9A-Fa-f]{6}$/.test(shade.hex.trim())) {
-    throw new Error("Couldn't read the shade from that product image. Try a clearer photo or swatch.");
+  if (mode === 'multi' && productImages.length > 5) {
+    throw new Error('Multi mode supports up to 5 products.');
   }
-  const hex = shade.hex.startsWith('#') ? shade.hex : `#${shade.hex}`;
+
+  // Step 1: describe shade (single mode only — skipped for multi since each
+  // product has its own shade and the AI will read each visually).
+  let shade: { hex: string; description: string; finish: string } | null = null;
+  if (mode === 'single') {
+    try {
+      shade = await handleDescribeShade({ productImage: productImages[0], zone: payload.zone });
+    } catch {
+      throw new Error("Couldn't read the shade from that product image. Try a clearer photo or swatch.");
+    }
+    if (!shade?.hex || !/^#?[0-9A-Fa-f]{6}$/.test(shade.hex.trim())) {
+      throw new Error("Couldn't read the shade from that product image. Try a clearer photo or swatch.");
+    }
+    shade.hex = shade.hex.startsWith('#') ? shade.hex : `#${shade.hex}`;
+  }
 
   // Step 2: generate try-on image. PRIMARY: OpenAI gpt-image-2 (newer Nano
   // Banana — the same model ChatGPT uses, dramatically better preservation
   // and colour fidelity than Gemini). FALLBACK 1: gpt-image-1 (older OpenAI).
   // FALLBACK 2: Gemini Nano Banana 2.5 (in case OpenAI is unreachable).
-  // OpenAI-native prompts, structured the way GPT-Image responds best to:
-  // TASK / INPUTS / INSTRUCTIONS / OUTPUT STYLE blocks. One template per zone.
-  // Same prompt is reused for the Gemini fallback (it's understandable to
-  // both models).
-  const openAIPrompt = buildTryOnPrompt(payload.zone, hex, shade.description, shade.finish);
+  const openAIPrompt = mode === 'single' && shade
+    ? buildTryOnPrompt(payload.zone, shade.hex, shade.description, shade.finish)
+    : buildMultiTryOnPrompt(productImages.length);
   const geminiPrompt = openAIPrompt;
 
   let imageBase64: string | null = null;
@@ -499,16 +553,17 @@ async function handleTryOn(payload: {
   // Attempt 1: OpenAI gpt-image-2 (primary). Quality routed from user choice:
   //   ultra → openai 'high' (~£0.13, ~50s, sharpest result)
   //   medium → openai 'medium' (~£0.05, ~20s, good for browsing)
+  const openAIImages = [
+    { data: payload.selfieImage, mime: 'image/jpeg' },
+    ...productImages.map((data) => ({ data, mime: 'image/jpeg' })),
+  ];
   try {
-    console.log(`[try-on] attempt 1: openai ${OPENAI_IMAGE_MODEL} (${openAIQuality})`);
+    console.log(`[try-on] attempt 1: openai ${OPENAI_IMAGE_MODEL} (${openAIQuality}, mode=${mode}, products=${productImages.length})`);
     imageBase64 = await callOpenAIImageEdit({
       model: OPENAI_IMAGE_MODEL,
       prompt: openAIPrompt,
       quality: openAIQuality,
-      images: [
-        { data: payload.selfieImage, mime: 'image/jpeg' },
-        { data: payload.productImage, mime: 'image/jpeg' },
-      ],
+      images: openAIImages,
     });
   } catch (e) {
     lastError = e instanceof Error ? e.message : 'Unknown error';
@@ -530,10 +585,7 @@ async function handleTryOn(payload: {
         model: OPENAI_IMAGE_FALLBACK,
         prompt: openAIPrompt,
         quality: openAIQuality,
-        images: [
-          { data: payload.selfieImage, mime: 'image/jpeg' },
-          { data: payload.productImage, mime: 'image/jpeg' },
-        ],
+        images: openAIImages,
       });
       lastError = null;
     } catch (e) {
@@ -551,7 +603,9 @@ async function handleTryOn(payload: {
           parts: [
             { text: geminiPrompt },
             { inlineData: { mimeType: 'image/jpeg', data: payload.selfieImage } },
-            { inlineData: { mimeType: 'image/jpeg', data: payload.productImage } },
+            ...productImages.map((data) => ({
+              inlineData: { mimeType: 'image/jpeg', data },
+            })),
           ],
         }],
       });
@@ -576,6 +630,7 @@ async function handleTryOn(payload: {
   return {
     imageBase64,
     shade,
+    mode,
     quality,
   };
 }
@@ -861,9 +916,16 @@ serve(async (req) => {
 
     if (userError || !user) return json({ error: 'User not found' }, 401);
 
-    // Variable credit cost: try-on at ultra quality costs 2, everything else costs 1.
-    const isUltraTryOn = task === 'try-on' && payload?.quality === 'ultra';
-    const creditCost = isUltraTryOn ? 2 : 1;
+    // Variable credit cost. Try-on combines two modifiers:
+    //   base                                = 1 credit
+    //   + 1 if multi mode (full-face look)  = 2 credits
+    //   + 1 if ultra quality                = 3 credits max
+    // Non try-on tasks always cost 1 credit.
+    let creditCost = 1;
+    if (task === 'try-on') {
+      if (payload?.mode === 'multi') creditCost += 1;
+      if (payload?.quality === 'ultra') creditCost += 1;
+    }
 
     if (user.credits < creditCost) {
       return json({ error: 'Out of credits', credits: user.credits, required: creditCost }, 402);

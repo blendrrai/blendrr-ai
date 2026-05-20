@@ -106,7 +106,7 @@ export default function Credits() {
     setRedeeming(false);
     if (result.ok) {
       setCodeInput('');
-      Alert.alert('Code applied 🎉', `+${result.reward} credits added to your account.`);
+      Alert.alert('Code applied 🎉', 'Free credits added to your account.');
     } else {
       Alert.alert("Code didn't apply", result.error);
     }
@@ -224,8 +224,9 @@ export default function Credits() {
             </View>
           </View>
           <Text style={styles.sectionHelper}>
-            Each AI try-on or skincare / haircare analysis spends one credit. Pro members get{' '}
-            {PRO_CREDITS_PER_MONTH} credits a month, shared across both.
+            Most AI features (quizzes, ingredient scans, single-product try-ons) cost 1 credit.
+            Try-ons can cost 1–3 credits depending on your selections: +1 for a full-face look
+            (multiple products), +1 for Ultra HD quality. Pro members get {PRO_CREDITS_PER_MONTH} credits a month.
           </Text>
         </View>
 

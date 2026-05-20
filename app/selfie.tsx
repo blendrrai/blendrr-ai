@@ -15,7 +15,7 @@ export default function SelfieStep() {
   return (
     <Screen>
       <StepHeader
-        step="Step 1 of 3"
+        step="Step 1 of 5"
         title="Drop a selfie"
         subtitle="Front-facing, soft light, hair pulled back if you're trying lips or face shades."
       />
@@ -38,7 +38,7 @@ export default function SelfieStep() {
       <View style={styles.cta}>
         <Button
           label="Continue"
-          onPress={() => router.push('/product')}
+          onPress={() => router.push('/mode')}
           disabled={!selfieUri}
           trailing={<ArrowRight size={20} color={colors.primaryOn} strokeWidth={2.4} />}
         />
