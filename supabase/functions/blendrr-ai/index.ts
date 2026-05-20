@@ -160,22 +160,29 @@ async function handleTryOn(payload: { selfieImage: string; productImage: string;
   // Banana is fundamentally a single-image editor and gets confused by a
   // second reference image (returns text-only output). The hex string + verbal
   // anti-darkening guidance is the only colour anchor.
-  const prompt = `You are performing a PRECISE LOCAL EDIT on a portrait photograph. Preserve every pixel outside the target region exactly.
+  const prompt = `You are applying a fully opaque layer of makeup to a portrait photograph. This is a precise local edit — preserve every pixel outside the target region exactly, but inside the target region, COMPLETELY REPLACE the existing colour with the target shade. Think of this like painting over the region with full-coverage cosmetic pigment, NOT applying a sheer tint or wash.
 
 TARGET REGION:
 ${ZONE_REGION[payload.zone] ?? payload.zone}
 
-TARGET COLOUR — this is your single source of truth, do not deviate:
+TARGET COLOUR — apply this exactly, at full coverage:
 - Hex: ${hex}
 - Description: ${shade.description}
 - Finish: ${shade.finish} (${FINISH_VISUAL[shade.finish] ?? 'natural finish'})
 
-COLOUR ACCURACY RULES — most try-on systems fail by over-darkening; do not do that:
-- ${hex} represents the shade as it would appear in even, well-lit conditions. Apply it at THAT brightness.
-- Do NOT darken, mute, or auto-shift the colour to make it "look more natural". The shade is already calibrated.
-- A colour-picker sampling the well-lit centre of the result should return a value within ~10% of ${hex}. If your output is visibly darker than ${hex}, you have failed.
-- For glossy/satin finishes, add specular highlights ON TOP of the base shade. Do NOT darken the base to imply gloss.
-- For matte finishes, the colour is flat and uniform across the region.
+COVERAGE — this is critical:
+- The result must LOOK LIKE LIPSTICK/MAKEUP HAS BEEN APPLIED. A person comparing before and after should immediately see the colour has changed and the product has been "worn".
+- The natural underlying colour (e.g. bare lip pink) must be COMPLETELY COVERED by ${hex}. Do not show the underlying colour through the shade.
+- This applies even when ${hex} is close to the natural skin/lip tone (e.g. nudes, "your lips but better" shades). A nude lipstick is still OPAQUE — it just happens to be a nude colour. The before and after should still be visibly different because the surface texture and pigment coverage change.
+- Do NOT apply the shade as a sheer wash or tint. Full lipstick/foundation/cream coverage only.
+
+COLOUR ACCURACY — separately from coverage:
+- ${hex} represents the shade in even, well-lit conditions. Apply at THAT brightness — neither darker nor lighter.
+- Do NOT auto-darken to "make it look more natural worn". The shade is calibrated.
+- Do NOT auto-lighten or desaturate to avoid looking bold. If the product is bold, the result should be bold.
+- A colour picker sampling the well-lit centre of the result should return within ~10% of ${hex}. Darker = wrong. Lighter / less saturated = also wrong.
+- For glossy/satin finishes, add reflective highlights ON TOP of the fully-applied base shade.
+- For matte finishes, the colour is flat and uniform across the region, no internal shading.
 
 ABSOLUTE PRESERVATION — these must remain identical to source:
 1. Identity, face shape, jawline, nose, brows, eye colour, expression
@@ -188,7 +195,7 @@ ABSOLUTE PRESERVATION — these must remain identical to source:
 8. Clothing, jewellery, accessories
 9. Framing, crop, resolution, aspect ratio
 
-ONLY modify the target region's pixels to ${hex} with a ${shade.finish} finish. Respect underlying form — change colour, not shape.
+Apply ${hex} at FULL OPACITY with a ${shade.finish} finish across the target region. Change colour and coverage, not shape.
 
 Output: the edited image only.`;
 
