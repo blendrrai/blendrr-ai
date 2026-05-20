@@ -103,29 +103,30 @@ const FINISH_VISUAL: Record<string, string> = {
 };
 
 async function handleDescribeShade(payload: { productImage: string; zone: string }) {
-  const prompt = `You are a colour-matching specialist for a beauty app. Analyse this image of a cosmetic product (for ${payload.zone}) and return the EXACT hex code of the TRUE makeup shade.
+  const prompt = `You are a colour-matching specialist for a beauty app. Analyse this image of a cosmetic product (for ${payload.zone}) and return the EXACT hex code of the TRUE makeup shade — the shade as a brand would print it on a colour-block swatch card, NOT how it appears in this specific photo.
 
-CRITICAL — how to read the colour accurately:
-1. Sample from the BRIGHTEST, most evenly-lit, most saturated region of the product or swatch.
-2. Photo lighting and shadows make products look DARKER than they are. Ignore the dark edges, shadow falloff, and any low-light areas. Read from the well-lit centre.
-3. Glossy lipsticks often show specular highlights (white reflections) — don't mistake those for the shade; sample beside them, NOT on them.
-4. If the product is shown applied on a model's lips/skin, lip wetness or shadow can deepen the apparent colour. Compensate: assume the actual product shade is 10-15% lighter and more saturated than what you see on the lit application.
-5. Brand swatch images (those colour-block stock photos) are the most accurate source — prefer those if visible.
+PRIORITY ORDER for reading (use the highest available source):
+1. SWATCH BLOCK on white background (brand stock image) — read directly, this IS the true shade
+2. SWATCH on skin/paper — read directly, then mentally brighten ~10% to remove skin undertone bleed
+3. PRODUCT BULLET/PAN visible — read the brightest, most evenly-lit point of the product itself, ignoring shadow side
+4. APPLIED PRODUCT on a model's lips/skin — read from the brightest application area, then brighten by 15-20% to compensate for lip wetness, skin tone, and lighting darkening
+5. PACKAGING ONLY (caps, tubes) — last resort, infer best estimate
 
-Priority order for reading:
-1. SWATCH on skin/paper — read directly (most accurate)
-2. APPLIED PRODUCT on a model — read from the brightest application area, then mentally brighten 10-15%
-3. PRODUCT BULLET/PAN visible — read actual product surface, avoid shadow side
-4. PACKAGING ONLY — infer best estimate
+CRITICAL accuracy rules:
+- The hex you return represents the shade in PERFECT NEUTRAL LIGHTING. Photo lighting almost always darkens what you see. ERR LIGHTER, NOT DARKER.
+- For nude / pink-toned lipsticks like Pillow Talk Medium, MAC Velvet Teddy, etc — these read as warm pinkish-browns around #B07060 to #C88575. If you find yourself returning anything below #8B5040, you are probably reading shadow, re-sample.
+- For bold reds, full-pigment shades will be saturated (high chroma). If your hex has R, G, B all under 100, you're reading shadow not pigment.
+- For deep berry/wine shades, do read them dark — but again, sample the BRIGHTEST point.
+- DO NOT average across the image. Pick the single brightest, least-shadowed pixel area and read THAT.
 
-IGNORE entirely: tube/bottle material, brand labels, background, photo lighting cast, reflections, watermarks.
+IGNORE entirely: tube/bottle/cap material colour, brand labels, background, photo lighting cast, white specular highlights, reflections, watermarks.
 
 Finish definitions:
-- matte: no shine, soft
-- satin: subtle natural sheen
-- glossy: wet, reflective
-- shimmer: glitter particles visible
-- metallic: chrome/foil-like
+- matte: no shine, soft and powdery, completely flat reflectance
+- satin: subtle natural sheen, smooth but not wet
+- glossy: wet, reflective, light-catching, mirror-like highlights
+- shimmer: visible glitter or sparkle particles within the shade
+- metallic: chrome or foil-like, extremely reflective
 - sheer: translucent, low pigment
 
 Return ONLY this JSON, no preamble:
@@ -151,29 +152,36 @@ async function handleTryOn(payload: { selfieImage: string; productImage: string;
   }
   const hex = shade.hex.startsWith('#') ? shade.hex : `#${shade.hex}`;
 
-  // Step 2: generate try-on image
-  const prompt = `You are performing a PRECISE LOCAL EDIT on a portrait photograph. This is not image generation — you are editing a single region of the source photo and preserving every other pixel as faithfully as possible.
+  // Step 2: generate try-on image. We send BOTH images so the model has a
+  // visual colour reference, not just a hex string. Selfie is "image 1" and
+  // the product is "image 2" — we make this explicit in the prompt.
+  const prompt = `You are editing IMAGE 1 (a person's selfie) by transferring the COLOUR shown in IMAGE 2 (a beauty product) onto a specific region. This is a precise local edit — preserve every pixel of IMAGE 1 outside the target region.
 
-SOURCE: The image provided is a person's selfie. Preserve it pixel-by-pixel everywhere except the target region.
+TWO IMAGES PROVIDED:
+- IMAGE 1: the selfie. Edit only the target region.
+- IMAGE 2: the product. Use it as a visual colour reference. Read the brightest, most saturated point of the product itself (not its packaging, not the shadow side).
 
-TARGET REGION:
+TARGET REGION (on IMAGE 1):
 ${ZONE_REGION[payload.zone] ?? payload.zone}
 
-TARGET COLOUR — single source of truth, use it exactly:
-- Hex: ${hex}
+TARGET COLOUR:
+- Hex value: ${hex} — this is your source of truth
 - Description: ${shade.description}
+- Visual reference: IMAGE 2 — read the colour off the actual product bullet/swatch, not packaging
 
 TARGET FINISH:
 - Type: ${shade.finish}
 - Visual: ${FINISH_VISUAL[shade.finish] ?? 'natural finish'}
 
-CRITICAL — colour fidelity:
-- Apply ${hex} at its TRUE saturation and brightness. Do NOT darken, mute, or shade-shift the colour.
-- The natural lighting in the source photo will cast subtle highlights/shadows on the target region — that is correct. But the BASE shade should match ${hex} as closely as possible in the well-lit centre of the region.
-- If you are tempted to "make it look natural" by darkening, RESIST. Most try-on systems fail because they over-blend; we want the shade to read accurately, even if it looks a touch bolder than the photo's ambient mood.
-- For glossy/satin finishes, add highlights ON TOP of the true shade, not by darkening it.
+COLOUR ACCURACY — this is the #1 thing people complain about:
+- The hex ${hex} represents the colour as it would appear in even, well-lit conditions. APPLY IT AT THAT BRIGHTNESS.
+- Do NOT auto-darken the shade to make it "look more natural worn". This is the most common failure mode of try-on systems and it makes the result look wrong.
+- IMAGE 2 shows you the actual colour — when in doubt, look at the brightest part of the product in IMAGE 2 and match that, NOT a darker interpretation of it.
+- The result lip/cheek/hair colour, sampled with a colour picker at the centre of the lit region, should be within 10% of ${hex}. If you produce something visibly darker, you have failed.
+- For glossy/satin finishes, add reflective highlights ON TOP of the base shade — do NOT darken the base to imply gloss.
+- For matte finishes, the colour is flat and uniform across the region — no internal shading.
 
-ABSOLUTE PRESERVATION — these must remain IDENTICAL to source:
+ABSOLUTE PRESERVATION OF IMAGE 1 — these must remain identical:
 1. Identity, face shape, jawline, nose, brows, eye colour, expression
 2. Skin tone, texture, pores, freckles, moles — do NOT smooth or retouch
 3. Lighting direction, temperature, shadows, highlights
@@ -184,21 +192,46 @@ ABSOLUTE PRESERVATION — these must remain IDENTICAL to source:
 8. Clothing, jewellery, accessories
 9. Framing, crop, resolution, aspect ratio
 
-ONLY modify the target region's pixels to ${hex} with the ${shade.finish} finish. Respect the underlying form — change colour, not shape.
+ONLY modify the target region's pixels to match ${hex} with a ${shade.finish} finish. Respect the underlying form — change colour, not shape.
 
-A side-by-side comparison should show ZERO visible difference outside the target region, and the target region should read as ${hex} to a colour picker, not a darker version.
+Output: the edited IMAGE 1 only. Do not return IMAGE 2 or any composite.`;
 
-Output: the edited image only.`;
+  // Retry up to 2 times if the model returns text instead of an image (happens
+  // ~5% of the time — safety filter false positives, internal errors, etc.)
+  let imageBase64: string | null = null;
+  let lastError: string | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const parts = await callGemini(IMAGE_MODEL, {
+        contents: [{
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType: 'image/jpeg', data: payload.selfieImage } },
+            { inlineData: { mimeType: 'image/jpeg', data: payload.productImage } },
+          ],
+        }],
+      });
+      const imagePart = parts.find((p) => p.inlineData);
+      if (imagePart?.inlineData) {
+        imageBase64 = imagePart.inlineData.data;
+        break;
+      }
+      lastError = 'No image returned';
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : 'Unknown error';
+      // Don't retry on safety blocks — those won't change on re-roll
+      if (lastError.toLowerCase().includes('safety')) break;
+    }
+    // Small backoff between retries
+    if (attempt < 2) await new Promise((r) => setTimeout(r, 400));
+  }
 
-  const parts = await callGemini(IMAGE_MODEL, {
-    contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: 'image/jpeg', data: payload.selfieImage } }] }],
-  });
-
-  const imagePart = parts.find((p) => p.inlineData);
-  if (!imagePart?.inlineData) throw new Error('No image returned by Gemini');
+  if (!imageBase64) {
+    throw new Error(lastError ?? 'Gemini did not return an image after 3 attempts. Try a different selfie or product image.');
+  }
 
   return {
-    imageBase64: imagePart.inlineData.data,
+    imageBase64,
     shade,
   };
 }
