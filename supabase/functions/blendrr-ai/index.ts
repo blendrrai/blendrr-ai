@@ -247,12 +247,16 @@ Preserve everything else in the first image exactly — face shape, identity, sk
   let imageBase64: string | null = null;
   let lastError: string | null = null;
 
-  // Attempt 1: OpenAI gpt-image-2 (primary)
+  // Attempt 1: OpenAI gpt-image-2 (primary). Quality 'medium' is the sweet
+  // spot: ~75% cheaper than 'high' (£0.05 vs £0.13 per call) and 50% faster
+  // (~20s vs 50s), with quality drop barely perceptible — the dramatic jump
+  // was Gemini → OpenAI, not medium → high.
   try {
-    console.log(`[try-on] attempt 1: openai ${OPENAI_IMAGE_MODEL}`);
+    console.log(`[try-on] attempt 1: openai ${OPENAI_IMAGE_MODEL} (medium)`);
     imageBase64 = await callOpenAIImageEdit({
       model: OPENAI_IMAGE_MODEL,
       prompt: openAIPrompt,
+      quality: 'medium',
       images: [
         { data: payload.selfieImage, mime: 'image/jpeg' },
         { data: payload.productImage, mime: 'image/jpeg' },
@@ -273,10 +277,11 @@ Preserve everything else in the first image exactly — face shape, identity, sk
   );
   if (!imageBase64 && modelUnavailable) {
     try {
-      console.log(`[try-on] attempt 2: openai ${OPENAI_IMAGE_FALLBACK}`);
+      console.log(`[try-on] attempt 2: openai ${OPENAI_IMAGE_FALLBACK} (medium)`);
       imageBase64 = await callOpenAIImageEdit({
         model: OPENAI_IMAGE_FALLBACK,
         prompt: openAIPrompt,
+        quality: 'medium',
         images: [
           { data: payload.selfieImage, mime: 'image/jpeg' },
           { data: payload.productImage, mime: 'image/jpeg' },

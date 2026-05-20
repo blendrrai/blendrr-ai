@@ -11,7 +11,7 @@ import Animated, {
 import { useEffect } from 'react';
 import { colors, radius, shadow, spacing, type } from '../lib/theme';
 
-export function AiLoading({ label }: { label: string }) {
+export function AiLoading({ label, hint }: { label: string; hint?: string }) {
   const rotate = useSharedValue(0);
   const breathe = useSharedValue(0);
   useEffect(() => {
@@ -36,7 +36,7 @@ export function AiLoading({ label }: { label: string }) {
         <Sparkles size={32} color={colors.primary} strokeWidth={1.6} />
       </Animated.View>
       <Text style={styles.title}>{label}</Text>
-      <Text style={styles.body}>Usually 3–6 seconds. Keep the app open.</Text>
+      <Text style={styles.body}>{hint ?? 'This usually takes 10–30 seconds. Keep the app open.'}</Text>
     </View>
   );
 }

@@ -145,7 +145,12 @@ export default function ResultScreen() {
         contentContainerStyle={styles.bodyContent}
         showsVerticalScrollIndicator={false}
       >
-        {state.kind === 'loading' && <AiLoading label="Blending your shade…" />}
+        {state.kind === 'loading' && (
+          <AiLoading
+            label="Blending your shade…"
+            hint="Try-ons take 20–40 seconds — we're getting the shade pixel-perfect. Keep the app open."
+          />
+        )}
         {state.kind === 'error' && <AiError message={state.message} onRetry={run} />}
         {state.kind === 'no-credits' && <NoCredits reason={state.reason} />}
 
