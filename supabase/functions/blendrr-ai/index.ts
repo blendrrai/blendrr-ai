@@ -158,16 +158,26 @@ async function handleTryOn(payload: { selfieImage: string; productImage: string;
   // Step 2: generate try-on image. Multi-image input — image 1 is the selfie
   // to edit, image 2 is the product as a visual colour reference. Short prompt
   // because verbose prompts + multi-image confuses Nano Banana into returning
-  // text-only output.
-  const prompt = `Two images. Image 1: a portrait. Image 2: a ${payload.zone === 'lips' ? 'lipstick product' : payload.zone === 'hair' ? 'hair colour product' : 'makeup product'}.
+  // text-only output. Tight focus on COLOUR ACCURACY since that's the recurring
+  // complaint.
+  const productLabel = payload.zone === 'lips' ? 'lipstick product' : payload.zone === 'hair' ? 'hair colour product' : 'makeup product';
+  const sampleRegion = payload.zone === 'lips' ? 'the lipstick bullet (the cylindrical wax/cream cosmetic itself, NOT the cap, tube, gold packaging, or logo)' : payload.zone === 'hair' ? 'the visible hair colour swatch or sample' : 'the product surface (powder pan, cream pot, or swatch)';
+  const targetRegion = payload.zone === 'lips' ? 'the lips' : payload.zone === 'hair' ? 'the hair' : 'the cheeks and forehead (foundation/blush coverage)';
+  const productType = payload.zone === 'lips' ? 'lipstick' : payload.zone === 'hair' ? 'hair colour' : 'makeup';
 
-Read the exact colour of the ${payload.zone === 'lips' ? 'lipstick bullet' : 'product'} in image 2 — ignore packaging, cap, logos, and shadows. The colour is approximately ${hex} (${shade.description}).
+  const prompt = `Two images:
+- Image 1: a portrait (this is the canvas you will edit)
+- Image 2: a ${productLabel} (this is your colour reference)
 
-Edit image 1: apply that colour to the ${payload.zone === 'lips' ? 'lips' : payload.zone === 'hair' ? 'hair' : 'face (cheeks/forehead)'} as a ${shade.finish} ${payload.zone === 'lips' ? 'lipstick' : payload.zone === 'hair' ? 'hair colour' : 'makeup'}. Opaque, full coverage — the result should clearly look like ${payload.zone === 'lips' ? 'lipstick has been applied' : payload.zone === 'hair' ? 'the hair has been dyed' : 'foundation/blush has been applied'}, not a sheer tint. Match the colour from image 2 precisely — do not darken or lighten.
+COLOUR SOURCE — image 2 is the source of truth. Locate ${sampleRegion}. The colour of that region is your EXACT target — sample it from the brightest, most evenly-lit point. As a sanity check, the colour should be roughly ${hex} (${shade.description}); if your read of image 2 disagrees strongly with this, trust image 2 over the hex.
 
-Preserve everything else in image 1 exactly: face, skin tone, freckles, eyes, hair (if not target), lighting, background, ${payload.zone === 'lips' ? 'lip shape' : 'shape of the target region'}. Edit ONLY the target region.
+COLOUR APPLICATION — edit image 1 to apply that exact colour to ${targetRegion}. The result must match the colour in image 2 precisely — same hue, same saturation, same brightness. Do NOT shift the colour to look "more natural" or "more wearable". Do NOT darken it. Do NOT lighten it. Do NOT desaturate it. Replicate the colour from image 2 without alteration. If the product is bold, the result is bold; if it's nude, the result is nude — but the colour itself does not change.
 
-Output: the edited image 1.`;
+COVERAGE — apply as a ${shade.finish} ${productType} at full opaque coverage. The natural underlying colour (e.g. bare lip pink) must be COMPLETELY covered. The result should clearly look like ${productType} has been applied, not a sheer tint or wash. This applies even for nude shades — a nude lipstick is still opaque.
+
+PRESERVATION — preserve image 1 exactly outside the target region. Identical to source: face shape, jawline, nose, brows, eye colour, expression, skin tone (do NOT warm, cool, or tan the skin), skin texture, freckles, moles, lighting direction, shadows, hair (if not target), eyes, eyelashes, clothing, background, lip outline / hairline shape. Do not retouch or beautify. Edit ONLY ${targetRegion}.
+
+Output: the edited image 1 only.`;
 
   // Retry up to 3 times if the model returns text instead of an image (~5%
   // of the time — safety filter false positives, internal errors, timeouts).
