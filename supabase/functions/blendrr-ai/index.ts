@@ -210,6 +210,98 @@ Return ONLY this JSON, no preamble:
   return extractJson<{ hex: string; description: string; finish: string }>(extractText(parts));
 }
 
+/**
+ * Build the try-on prompt for the given zone. Structure follows what GPT-Image
+ * responds best to: TASK / INPUTS / INSTRUCTIONS / OUTPUT STYLE blocks.
+ *
+ * Designed to be easy to extend later when we split `face` into sub-zones
+ * (foundation, blush, concealer, contour, bronzer). Each sub-zone would get
+ * its own case here with tailored INSTRUCTIONS — the TASK/INPUTS/OUTPUT shell
+ * stays the same.
+ */
+function buildTryOnPrompt(
+  zone: 'lips' | 'face' | 'hair',
+  hex: string,
+  description: string,
+  finish: string,
+): string {
+  const header = `You are a professional beauty AI image editor.`;
+  const outputStyle = `OUTPUT STYLE:\nUltra realistic beauty campaign / iPhone selfie realism. No glam filters, no AI artifacts, no doll-like skin, no plastic textures. The result should look like a real photo of a real person wearing real makeup.`;
+
+  if (zone === 'lips') {
+    return `${header}
+
+TASK:
+Apply the lipstick from the reference product image onto the person's lips in the selfie, naturally and realistically.
+
+INPUTS:
+- 1 selfie image (the first image — this is the canvas you will edit)
+- 1 lipstick product image (the second image — use the lipstick bullet as the colour reference)
+
+INSTRUCTIONS:
+- Preserve the person's exact identity, facial structure, skin tone, skin texture, hairstyle, lighting, shadows, and camera characteristics.
+- Do NOT beautify the person, smooth the skin, alter facial proportions, or change skin tone.
+- Match the lipstick shade from the reference image as accurately as possible. Read the colour from the lipstick bullet itself (the cylindrical wax/cream), NOT the cap, tube, or packaging.
+- The shade is approximately ${hex} (${description}) — use this as a sanity check, but trust the product image as the primary colour source.
+- Apply the lipstick with proper opaque coverage — the natural lip colour must be fully covered. The result should clearly look like worn lipstick, not a sheer tint or wash.
+- Maintain a realistic ${finish} finish that matches the product (matte = flat, no shine; satin = subtle natural sheen; glossy = wet/reflective; shimmer = visible sparkle particles).
+- Apply lipstick ONLY to the lips with realistic edges and natural lip texture. Do NOT change lip shape, lip line, philtrum, or any surrounding skin.
+- Preserve the original pose, expression, background, framing, crop, aspect ratio, and exact face position within the frame. A user comparing before and after should see the face stay still — only the lip colour changes.
+- Avoid over-smoothing, AI artifacts, glam filters, or unrealistic skin.
+
+${outputStyle}`;
+  }
+
+  if (zone === 'hair') {
+    return `${header}
+
+TASK:
+Apply the hair colour from the reference product image onto the person's hair in the selfie, naturally and realistically.
+
+INPUTS:
+- 1 selfie image (the first image — this is the canvas you will edit)
+- 1 hair colour product image (the second image — use the colour swatch or sample as the reference)
+
+INSTRUCTIONS:
+- Preserve the person's exact identity, facial features, skin, hairstyle shape, hair length, parting, hairline, lighting, shadows, and camera characteristics.
+- Do NOT change hair shape, length, parting, fly-aways, or hairline position. Only recolour the existing hair.
+- Match the hair colour from the reference image as accurately as possible.
+- The shade is approximately ${hex} (${description}) — use this as a sanity check, but trust the product image as the primary colour source.
+- Recolour the hair while preserving natural strand texture, highlights, lowlights, and the dimensional colour variation that real hair has. Do NOT make the hair look flat, painted, or like a solid colour block.
+- Apply ONLY to hair strands. Do NOT change face, skin, eyebrows, eyelashes, or background.
+- Preserve the original pose, expression, background, framing, crop, aspect ratio, and exact face position within the frame.
+- Avoid AI artifacts, plastic-looking hair, or unrealistic uniform colour.
+
+${outputStyle}`;
+  }
+
+  // zone === 'face' — currently treated as foundation. When face is split into
+  // sub-zones (blush, concealer, contour, bronzer), each becomes its own
+  // branch above with tailored INSTRUCTIONS.
+  return `${header}
+
+TASK:
+Apply the foundation from the reference product image onto the person's face in the selfie, naturally and realistically.
+
+INPUTS:
+- 1 selfie image (the first image — this is the canvas you will edit)
+- 1 foundation product image (the second image — use the foundation swatch or product surface as the colour reference)
+
+INSTRUCTIONS:
+- Preserve the person's exact identity, facial structure, facial features, hairstyle, lighting, shadows, and camera characteristics.
+- Do NOT beautify the person, alter facial proportions, change face shape, or change features.
+- Match the foundation shade from the reference image as accurately as possible. Read the colour from the actual foundation swatch / cream / liquid, NOT the bottle, cap, or labels.
+- The shade is approximately ${hex} (${description}) — use this as a sanity check, but trust the product image as the primary colour source.
+- Apply foundation across the ENTIRE face — forehead, temples, cheeks, nose, chin, jawline, the area under the eyes, and blend down to the neck. NOT in patches, NOT in stripes, NOT just on the cheeks.
+- Blend foundation naturally into the skin while preserving pores, freckles, moles, and realistic skin texture. Do NOT over-smooth, retouch, or create doll-like skin.
+- Match the product's finish (${finish}: matte = soft/flat, satin = natural smooth, dewy = subtle glow).
+- Apply ONLY to the SKIN. Do NOT cover the eyes, eyelashes, eyebrows, lips, or hairline.
+- Preserve the original pose, expression, background, framing, crop, aspect ratio, and exact face position within the frame.
+- Avoid over-smoothing, AI artifacts, glam filters, or unrealistic skin.
+
+${outputStyle}`;
+}
+
 async function handleTryOn(payload: { selfieImage: string; productImage: string; zone: 'lips' | 'face' | 'hair' }) {
   // Step 1: describe shade (Gemini text-vision — still good at this)
   let shade;
@@ -227,21 +319,11 @@ async function handleTryOn(payload: { selfieImage: string; productImage: string;
   // Banana — the same model ChatGPT uses, dramatically better preservation
   // and colour fidelity than Gemini). FALLBACK 1: gpt-image-1 (older OpenAI).
   // FALLBACK 2: Gemini Nano Banana 2.5 (in case OpenAI is unreachable).
-  const productLabel = payload.zone === 'lips' ? 'lipstick' : payload.zone === 'hair' ? 'hair colour product' : 'foundation or face makeup';
-  const sampleRegion = payload.zone === 'lips' ? 'the lipstick bullet (the cylindrical wax/cream itself, NOT the cap, tube, or packaging)' : payload.zone === 'hair' ? 'the visible hair colour swatch' : 'the foundation swatch (the actual cream/liquid/powder colour, NOT the bottle or labels)';
-  const targetRegion = payload.zone === 'lips' ? 'the lips' : payload.zone === 'hair' ? 'the hair' : 'the entire face (full foundation coverage — forehead, cheeks, nose, chin, jawline, under-eyes, blending to the neck — NOT just patches)';
-  const productType = payload.zone === 'lips' ? 'lipstick' : payload.zone === 'hair' ? 'hair colour' : 'foundation';
-
-  // OpenAI-native prompt: short, natural, directive. GPT-Image handles short
-  // visual instructions much better than the rules-heavy format Gemini needed.
-  const openAIPrompt = `The first image is a portrait. The second image is a ${productLabel} product (colour reference: approximately ${hex}, ${shade.description}).
-
-Apply the exact colour of ${sampleRegion} from the second image to ${targetRegion} of the person in the first image. Match the colour precisely — same hue, saturation, and brightness. Apply as a ${shade.finish} ${productType} at full opaque coverage. The result should clearly look like ${productType} has been worn, not a sheer tint.
-
-Preserve everything else in the first image exactly — face shape, identity, skin tone (do not warm, cool, or tan), skin texture, freckles, eyes, brows, hair (if not target), lighting, shadows, background, ${payload.zone === 'lips' ? 'lip shape' : 'shape of the target region'}, framing, crop, and the exact position of the face within the frame. Edit only ${targetRegion}.`;
-
-  // Gemini fallback uses the same prompt — it's still understandable, just
-  // slightly more verbose-friendly than gpt-image needs.
+  // OpenAI-native prompts, structured the way GPT-Image responds best to:
+  // TASK / INPUTS / INSTRUCTIONS / OUTPUT STYLE blocks. One template per zone.
+  // Same prompt is reused for the Gemini fallback (it's understandable to
+  // both models).
+  const openAIPrompt = buildTryOnPrompt(payload.zone, hex, shade.description, shade.finish);
   const geminiPrompt = openAIPrompt;
 
   let imageBase64: string | null = null;
