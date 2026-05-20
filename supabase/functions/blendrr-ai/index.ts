@@ -177,6 +177,13 @@ COVERAGE — apply as a ${shade.finish} ${productType} at full opaque coverage. 
 
 PRESERVATION — preserve image 1 exactly outside the target region. Identical to source: face shape, jawline, nose, brows, eye colour, expression, skin tone (do NOT warm, cool, or tan the skin), skin texture, freckles, moles, lighting direction, shadows, hair (if not target), eyes, eyelashes, clothing, background, lip outline / hairline shape. Do not retouch or beautify. Edit ONLY ${targetRegion}.
 
+FRAMING — this is critical. The output must have IDENTICAL composition to image 1:
+- Same crop, same aspect ratio, same dimensions
+- The face must occupy the EXACT same position within the frame as in image 1 — same size, same height, same horizontal placement
+- Do NOT zoom in or out. Do NOT pan. Do NOT recompose the shot. Do NOT shift the face up, down, left, or right.
+- Every pixel outside the target region (background, clothing, hair edges, anything visible behind/around the person) must be in the same place it was in image 1
+- A user sliding between "Before" (image 1) and "After" (your output) should see the face stay perfectly still — only the target region's colour changes
+
 Output: the edited image 1 only.`;
 
   // Retry up to 3 times if the model returns text instead of an image (~5%
