@@ -92,7 +92,7 @@ function extractJson<T>(text: string): T {
 
 const ZONE_REGION: Record<string, string> = {
   lips: 'Only the lip surface (upper and lower lip vertices). Do NOT change lip shape, lip line, philtrum, or the skin around the mouth.',
-  face: 'The natural foundation/blush coverage area — cheeks, forehead, nose bridge, chin, jawline. Apply as a thin, even wash. Do NOT smooth or retouch the skin.',
+  face: 'The ENTIRE face — forehead, temples, cheeks, nose, chin, jawline, the area under the eyes (concealer area), and blending down to the neck. Treat this like applying foundation: even, uniform, full-coverage across the whole face. NOT patches, NOT stripes, NOT just cheeks. The result should look like the person is wearing foundation that has been blended over their entire face. Preserve facial features (eyes, brows, lips, hairline) — apply only to the SKIN surface, not over eyes, lashes, brows, or lips.',
   hair: 'Only the hair strands themselves. Do NOT change hair shape, length, parting, fly-aways, or the hairline. Recolour while preserving texture.',
 };
 
@@ -160,10 +160,10 @@ async function handleTryOn(payload: { selfieImage: string; productImage: string;
   // because verbose prompts + multi-image confuses Nano Banana into returning
   // text-only output. Tight focus on COLOUR ACCURACY since that's the recurring
   // complaint.
-  const productLabel = payload.zone === 'lips' ? 'lipstick product' : payload.zone === 'hair' ? 'hair colour product' : 'makeup product';
-  const sampleRegion = payload.zone === 'lips' ? 'the lipstick bullet (the cylindrical wax/cream cosmetic itself, NOT the cap, tube, gold packaging, or logo)' : payload.zone === 'hair' ? 'the visible hair colour swatch or sample' : 'the product surface (powder pan, cream pot, or swatch)';
-  const targetRegion = payload.zone === 'lips' ? 'the lips' : payload.zone === 'hair' ? 'the hair' : 'the cheeks and forehead (foundation/blush coverage)';
-  const productType = payload.zone === 'lips' ? 'lipstick' : payload.zone === 'hair' ? 'hair colour' : 'makeup';
+  const productLabel = payload.zone === 'lips' ? 'lipstick product' : payload.zone === 'hair' ? 'hair colour product' : 'foundation or face makeup product';
+  const sampleRegion = payload.zone === 'lips' ? 'the lipstick bullet (the cylindrical wax/cream cosmetic itself, NOT the cap, tube, gold packaging, or logo)' : payload.zone === 'hair' ? 'the visible hair colour swatch or sample' : 'the foundation swatch or product surface (the actual cream/liquid/powder colour, NOT the packaging, bottle, or labels)';
+  const targetRegion = payload.zone === 'lips' ? 'the lips' : payload.zone === 'hair' ? 'the hair' : 'the entire face (full foundation coverage — forehead, cheeks, nose, chin, jawline, under-eyes, blending to the neck — NOT just patches or stripes)';
+  const productType = payload.zone === 'lips' ? 'lipstick' : payload.zone === 'hair' ? 'hair colour' : 'foundation';
 
   const prompt = `Two images:
 - Image 1: a portrait (this is the canvas you will edit)
