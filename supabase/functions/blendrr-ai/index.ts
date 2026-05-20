@@ -1,20 +1,26 @@
 // Supabase Edge Function: blendrr-ai
-// All Gemini API calls go through here. Client never has the Gemini key.
+// AI calls fan out to: Gemini (text/vision, shade extraction, quizzes,
+// search-grounded discovery) and OpenAI (image edits / try-on). Clients
+// never see either API key.
 // Deploy: `supabase functions deploy blendrr-ai`
 
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') ?? '';
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? '';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const TEXT_MODEL = 'gemini-2.5-flash';
-// Nano Banana 2.5 (GA) — faster and tends to preserve source images better
-// than the 3.1 preview. Falls back to 3.1 only if 2.5 fails outright.
-const IMAGE_MODEL = 'gemini-2.5-flash-image';
-const IMAGE_MODEL_FALLBACK = 'gemini-3.1-flash-image-preview';
+// Try-on image edits go through OpenAI's gpt-image-2 (newer GA model used by
+// ChatGPT). If unavailable on the account, automatic fallback to gpt-image-1.
+const OPENAI_IMAGE_MODEL = 'gpt-image-2';
+const OPENAI_IMAGE_FALLBACK = 'gpt-image-1';
+// Final-tier fallback if OpenAI itself is unreachable. Gemini Nano Banana 2.5
+// is GA and consistently returns an image (even if quality is lower).
+const GEMINI_IMAGE_FALLBACK = 'gemini-2.5-flash-image';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -87,6 +93,68 @@ function extractJson<T>(text: string): T {
 }
 
 // ============================================================================
+// OpenAI helpers — for image-edit (try-on) only
+// ============================================================================
+
+function base64ToBytes(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+/**
+ * Call OpenAI's Images Edit API with one or more reference images.
+ * Returns base64-encoded PNG of the edited image.
+ *
+ * Multi-image: the first image is the canvas being edited; subsequent images
+ * are references the model can see (e.g. a product image as a colour reference).
+ */
+async function callOpenAIImageEdit(opts: {
+  model: string;
+  prompt: string;
+  images: { data: string; mime?: string }[];
+  quality?: 'low' | 'medium' | 'high' | 'auto';
+  size?: '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+}): Promise<string> {
+  if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not configured');
+
+  const formData = new FormData();
+  formData.append('model', opts.model);
+  formData.append('prompt', opts.prompt);
+  formData.append('n', '1');
+  formData.append('size', opts.size ?? 'auto');
+  formData.append('quality', opts.quality ?? 'high');
+
+  opts.images.forEach((img, i) => {
+    const bytes = base64ToBytes(img.data);
+    const blob = new Blob([bytes], { type: img.mime ?? 'image/jpeg' });
+    const ext = (img.mime ?? 'image/jpeg').split('/')[1] ?? 'jpg';
+    formData.append('image[]', blob, `image-${i}.${ext}`);
+  });
+
+  const res = await fetch('https://api.openai.com/v1/images/edits', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    let message = text;
+    try {
+      message = JSON.parse(text)?.error?.message ?? text;
+    } catch { /* ignore */ }
+    throw Object.assign(new Error(`OpenAI ${res.status}: ${message}`), { status: res.status });
+  }
+
+  const data = await res.json();
+  const b64 = data?.data?.[0]?.b64_json;
+  if (!b64) throw new Error('OpenAI returned no image data');
+  return b64;
+}
+
+// ============================================================================
 // Task handlers
 // ============================================================================
 
@@ -143,7 +211,7 @@ Return ONLY this JSON, no preamble:
 }
 
 async function handleTryOn(payload: { selfieImage: string; productImage: string; zone: 'lips' | 'face' | 'hair' }) {
-  // Step 1: describe shade
+  // Step 1: describe shade (Gemini text-vision — still good at this)
   let shade;
   try {
     shade = await handleDescribeShade({ productImage: payload.productImage, zone: payload.zone });
@@ -155,52 +223,80 @@ async function handleTryOn(payload: { selfieImage: string; productImage: string;
   }
   const hex = shade.hex.startsWith('#') ? shade.hex : `#${shade.hex}`;
 
-  // Step 2: generate try-on image. Multi-image input — image 1 is the selfie
-  // to edit, image 2 is the product as a visual colour reference. Short prompt
-  // because verbose prompts + multi-image confuses Nano Banana into returning
-  // text-only output. Tight focus on COLOUR ACCURACY since that's the recurring
-  // complaint.
-  const productLabel = payload.zone === 'lips' ? 'lipstick product' : payload.zone === 'hair' ? 'hair colour product' : 'foundation or face makeup product';
-  const sampleRegion = payload.zone === 'lips' ? 'the lipstick bullet (the cylindrical wax/cream cosmetic itself, NOT the cap, tube, gold packaging, or logo)' : payload.zone === 'hair' ? 'the visible hair colour swatch or sample' : 'the foundation swatch or product surface (the actual cream/liquid/powder colour, NOT the packaging, bottle, or labels)';
-  const targetRegion = payload.zone === 'lips' ? 'the lips' : payload.zone === 'hair' ? 'the hair' : 'the entire face (full foundation coverage — forehead, cheeks, nose, chin, jawline, under-eyes, blending to the neck — NOT just patches or stripes)';
+  // Step 2: generate try-on image. PRIMARY: OpenAI gpt-image-2 (newer Nano
+  // Banana — the same model ChatGPT uses, dramatically better preservation
+  // and colour fidelity than Gemini). FALLBACK 1: gpt-image-1 (older OpenAI).
+  // FALLBACK 2: Gemini Nano Banana 2.5 (in case OpenAI is unreachable).
+  const productLabel = payload.zone === 'lips' ? 'lipstick' : payload.zone === 'hair' ? 'hair colour product' : 'foundation or face makeup';
+  const sampleRegion = payload.zone === 'lips' ? 'the lipstick bullet (the cylindrical wax/cream itself, NOT the cap, tube, or packaging)' : payload.zone === 'hair' ? 'the visible hair colour swatch' : 'the foundation swatch (the actual cream/liquid/powder colour, NOT the bottle or labels)';
+  const targetRegion = payload.zone === 'lips' ? 'the lips' : payload.zone === 'hair' ? 'the hair' : 'the entire face (full foundation coverage — forehead, cheeks, nose, chin, jawline, under-eyes, blending to the neck — NOT just patches)';
   const productType = payload.zone === 'lips' ? 'lipstick' : payload.zone === 'hair' ? 'hair colour' : 'foundation';
 
-  const prompt = `Two images:
-- Image 1: a portrait (this is the canvas you will edit)
-- Image 2: a ${productLabel} (this is your colour reference)
+  // OpenAI-native prompt: short, natural, directive. GPT-Image handles short
+  // visual instructions much better than the rules-heavy format Gemini needed.
+  const openAIPrompt = `The first image is a portrait. The second image is a ${productLabel} product (colour reference: approximately ${hex}, ${shade.description}).
 
-COLOUR SOURCE — image 2 is the source of truth. Locate ${sampleRegion}. The colour of that region is your EXACT target — sample it from the brightest, most evenly-lit point. As a sanity check, the colour should be roughly ${hex} (${shade.description}); if your read of image 2 disagrees strongly with this, trust image 2 over the hex.
+Apply the exact colour of ${sampleRegion} from the second image to ${targetRegion} of the person in the first image. Match the colour precisely — same hue, saturation, and brightness. Apply as a ${shade.finish} ${productType} at full opaque coverage. The result should clearly look like ${productType} has been worn, not a sheer tint.
 
-COLOUR APPLICATION — edit image 1 to apply that exact colour to ${targetRegion}. The result must match the colour in image 2 precisely — same hue, same saturation, same brightness. Do NOT shift the colour to look "more natural" or "more wearable". Do NOT darken it. Do NOT lighten it. Do NOT desaturate it. Replicate the colour from image 2 without alteration. If the product is bold, the result is bold; if it's nude, the result is nude — but the colour itself does not change.
+Preserve everything else in the first image exactly — face shape, identity, skin tone (do not warm, cool, or tan), skin texture, freckles, eyes, brows, hair (if not target), lighting, shadows, background, ${payload.zone === 'lips' ? 'lip shape' : 'shape of the target region'}, framing, crop, and the exact position of the face within the frame. Edit only ${targetRegion}.`;
 
-COVERAGE — apply as a ${shade.finish} ${productType} at full opaque coverage. The natural underlying colour (e.g. bare lip pink) must be COMPLETELY covered. The result should clearly look like ${productType} has been applied, not a sheer tint or wash. This applies even for nude shades — a nude lipstick is still opaque.
+  // Gemini fallback uses the same prompt — it's still understandable, just
+  // slightly more verbose-friendly than gpt-image needs.
+  const geminiPrompt = openAIPrompt;
 
-PRESERVATION — preserve image 1 exactly outside the target region. Identical to source: face shape, jawline, nose, brows, eye colour, expression, skin tone (do NOT warm, cool, or tan the skin), skin texture, freckles, moles, lighting direction, shadows, hair (if not target), eyes, eyelashes, clothing, background, lip outline / hairline shape. Do not retouch or beautify. Edit ONLY ${targetRegion}.
-
-FRAMING — this is critical. The output must have IDENTICAL composition to image 1:
-- Same crop, same aspect ratio, same dimensions
-- The face must occupy the EXACT same position within the frame as in image 1 — same size, same height, same horizontal placement
-- Do NOT zoom in or out. Do NOT pan. Do NOT recompose the shot. Do NOT shift the face up, down, left, or right.
-- Every pixel outside the target region (background, clothing, hair edges, anything visible behind/around the person) must be in the same place it was in image 1
-- A user sliding between "Before" (image 1) and "After" (your output) should see the face stay perfectly still — only the target region's colour changes
-
-Output: the edited image 1 only.`;
-
-  // Retry up to 3 times if the model returns text instead of an image (~5%
-  // of the time — safety filter false positives, internal errors, timeouts).
   let imageBase64: string | null = null;
   let lastError: string | null = null;
-  let textResponse: string | null = null;
-  // Try primary model (3.1 preview) for the first 2 attempts. If those fail,
-  // attempt 3 uses the 2.5 fallback — handles "preview model deprecated /
-  // unavailable" gracefully without users seeing a broken app.
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const model = attempt < 2 ? IMAGE_MODEL : IMAGE_MODEL_FALLBACK;
+
+  // Attempt 1: OpenAI gpt-image-2 (primary)
+  try {
+    console.log(`[try-on] attempt 1: openai ${OPENAI_IMAGE_MODEL}`);
+    imageBase64 = await callOpenAIImageEdit({
+      model: OPENAI_IMAGE_MODEL,
+      prompt: openAIPrompt,
+      images: [
+        { data: payload.selfieImage, mime: 'image/jpeg' },
+        { data: payload.productImage, mime: 'image/jpeg' },
+      ],
+    });
+  } catch (e) {
+    lastError = e instanceof Error ? e.message : 'Unknown error';
+    console.log(`[try-on] openai ${OPENAI_IMAGE_MODEL} failed: ${lastError}`);
+  }
+
+  // Attempt 2: OpenAI gpt-image-1 (only if 2 returned a model-not-available error)
+  const modelUnavailable = lastError && (
+    lastError.includes('does not exist') ||
+    lastError.includes('not found') ||
+    lastError.includes('model_not_found') ||
+    lastError.includes('invalid_model') ||
+    lastError.includes('404')
+  );
+  if (!imageBase64 && modelUnavailable) {
     try {
-      const parts = await callGemini(model, {
+      console.log(`[try-on] attempt 2: openai ${OPENAI_IMAGE_FALLBACK}`);
+      imageBase64 = await callOpenAIImageEdit({
+        model: OPENAI_IMAGE_FALLBACK,
+        prompt: openAIPrompt,
+        images: [
+          { data: payload.selfieImage, mime: 'image/jpeg' },
+          { data: payload.productImage, mime: 'image/jpeg' },
+        ],
+      });
+      lastError = null;
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : 'Unknown error';
+      console.log(`[try-on] openai ${OPENAI_IMAGE_FALLBACK} failed: ${lastError}`);
+    }
+  }
+
+  // Attempt 3: Gemini Nano Banana fallback (only if OpenAI is unreachable / down)
+  if (!imageBase64) {
+    try {
+      console.log(`[try-on] attempt 3: gemini ${GEMINI_IMAGE_FALLBACK} (fallback)`);
+      const parts = await callGemini(GEMINI_IMAGE_FALLBACK, {
         contents: [{
           parts: [
-            { text: prompt },
+            { text: geminiPrompt },
             { inlineData: { mimeType: 'image/jpeg', data: payload.selfieImage } },
             { inlineData: { mimeType: 'image/jpeg', data: payload.productImage } },
           ],
@@ -209,24 +305,19 @@ Output: the edited image 1 only.`;
       const imagePart = parts.find((p) => p.inlineData);
       if (imagePart?.inlineData) {
         imageBase64 = imagePart.inlineData.data;
-        break;
+        lastError = null;
+      } else {
+        lastError = `Gemini fallback returned no image. Text: ${extractText(parts).slice(0, 200)}`;
+        console.log(`[try-on] ${lastError}`);
       }
-      // No image returned — log what we got instead for debugging
-      textResponse = extractText(parts).slice(0, 200);
-      lastError = textResponse ? `No image. Model said: ${textResponse}` : 'No image returned';
-      console.log(`[try-on] attempt ${attempt + 1} (${model}) returned no image. Text: ${textResponse}`);
     } catch (e) {
       lastError = e instanceof Error ? e.message : 'Unknown error';
-      console.log(`[try-on] attempt ${attempt + 1} (${model}) threw: ${lastError}`);
-      // Don't retry on safety blocks — those won't change on re-roll
-      if (lastError.toLowerCase().includes('safety')) break;
+      console.log(`[try-on] gemini fallback failed: ${lastError}`);
     }
-    // Small backoff between retries
-    if (attempt < 2) await new Promise((r) => setTimeout(r, 400));
   }
 
   if (!imageBase64) {
-    throw new Error(lastError ?? 'Gemini did not return an image after 3 attempts. Try a different selfie or product image.');
+    throw new Error(lastError ?? 'No image returned. Try a different selfie or product image.');
   }
 
   return {
