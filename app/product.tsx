@@ -1,6 +1,4 @@
-import { useState } from 'react';
 import {
-  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -14,35 +12,15 @@ import { Screen } from '../components/Screen';
 import { StepHeader } from '../components/StepHeader';
 import { PhotoSlot } from '../components/PhotoSlot';
 import { Button } from '../components/Button';
-import { Divider, UrlInput } from '../components/UrlInput';
 import { colors, MAX_PRODUCTS_MULTI, radius, shadow, spacing, type } from '../lib/theme';
 import { useLook } from '../lib/state';
 import { presentPickerSheet } from '../lib/pickImage';
-import { fetchProductImage } from '../lib/fetchProductImage';
 
 export default function ProductStep() {
   const { mode, productUris, addProduct, removeProduct, replaceProduct } = useLook();
-  const [loadingUrl, setLoadingUrl] = useState(false);
 
   const isSingle = mode === 'single';
   const canAddMore = isSingle ? productUris.length === 0 : productUris.length < MAX_PRODUCTS_MULTI;
-
-  const handleUrl = async (url: string) => {
-    setLoadingUrl(true);
-    try {
-      const uri = await fetchProductImage(url);
-      if (!uri) {
-        Alert.alert(
-          "Couldn't find a product image",
-          'Some sites hide their photos behind login walls. Try uploading a screenshot instead.',
-        );
-        return;
-      }
-      addProduct(uri, url);
-    } finally {
-      setLoadingUrl(false);
-    }
-  };
 
   const pickProductFromCameraOrLibrary = () => {
     presentPickerSheet((uri) => addProduct(uri, null), {
@@ -66,10 +44,10 @@ export default function ProductStep() {
     <Screen>
       <StepHeader
         step="Step 4 of 5"
-        title={isSingle ? 'Pick a product' : 'Add your products'}
+        title={isSingle ? 'Add a product' : 'Add your products'}
         subtitle={
           isSingle
-            ? 'Upload a screenshot for best results, or paste a product link.'
+            ? 'Upload a screenshot or photo of the product you want to try on.'
             : `Up to ${MAX_PRODUCTS_MULTI} products. The AI figures out where each one goes.`
         }
       />
@@ -77,26 +55,18 @@ export default function ProductStep() {
       <ScrollView
         style={styles.flex}
         contentContainerStyle={styles.scrollContent}
-        keyboardDismissMode="on-drag"
-        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         {isSingle ? (
           <View style={styles.body}>
-            <OptionHeader number={1} label="Upload a screenshot" recommended />
             <View style={styles.slotWrap}>
               <PhotoSlot
                 uri={productUris[0] ?? null}
                 onPress={pickProductFromCameraOrLibrary}
                 emptyTitle="Upload a screenshot"
-                emptyHint="A clear shot of the lipstick, shadow, or hair colour. Swatches work best."
+                emptyHint="A clear shot of the lipstick, shadow, or hair colour. Brand swatches and product photos with the shade clearly visible work best."
               />
             </View>
-
-            <Divider label="Or" />
-
-            <OptionHeader number={2} label="Paste a product link" />
-            <UrlInput loading={loadingUrl} onSubmit={handleUrl} />
           </View>
         ) : (
           <View style={styles.body}>
@@ -118,13 +88,6 @@ export default function ProductStep() {
                 <AddProductCard onPress={pickProductFromCameraOrLibrary} />
               )}
             </View>
-
-            {canAddMore && (
-              <>
-                <Divider label="Or paste a product link" />
-                <UrlInput loading={loadingUrl} onSubmit={handleUrl} />
-              </>
-            )}
           </View>
         )}
 
@@ -138,30 +101,6 @@ export default function ProductStep() {
         </View>
       </ScrollView>
     </Screen>
-  );
-}
-
-function OptionHeader({
-  number,
-  label,
-  recommended,
-}: {
-  number: number;
-  label: string;
-  recommended?: boolean;
-}) {
-  return (
-    <View style={styles.optionHeader}>
-      <View style={styles.numberCircle}>
-        <Text style={styles.numberText}>{number}</Text>
-      </View>
-      <Text style={styles.optionLabel}>{label}</Text>
-      {recommended && (
-        <View style={styles.pill}>
-          <Text style={styles.pillText}>Recommended</Text>
-        </View>
-      )}
-    </View>
   );
 }
 
@@ -205,40 +144,6 @@ const styles = StyleSheet.create({
   body: { paddingVertical: spacing.md, gap: spacing.md },
   slotWrap: { height: 320 },
   cta: { marginTop: spacing.md, paddingBottom: spacing.lg },
-  optionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  numberCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  numberText: {
-    ...type.caption,
-    color: colors.primaryOn,
-    fontWeight: '700',
-    fontSize: 12,
-  },
-  optionLabel: { ...type.heading, fontSize: 15, color: colors.text, flex: 1 },
-  pill: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-    backgroundColor: colors.primary,
-  },
-  pillText: {
-    ...type.caption,
-    color: colors.primaryOn,
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
   helperText: { ...type.caption, color: colors.textMuted, fontWeight: '600' },
   grid: {
     flexDirection: 'row',
