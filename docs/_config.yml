@@ -1,0 +1,7 @@
+title: Blendrr Ai
+description: Privacy Policy and Terms of Service for the Blendrr Ai mobile app.
+theme: jekyll-theme-cayman
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
