@@ -32,6 +32,8 @@ export type TryOn = {
   productUris?: string[];
   productUrl: string | null;
   productUrls?: (string | null)[];
+  /** User-editable product name (added/changed in the try-on detail screen). */
+  productName?: string;
   /** Set when the try-on used multi mode. Missing on old records. */
   mode?: 'single' | 'multi';
   /** Quality tier used. Missing on old records. */
@@ -91,6 +93,26 @@ export async function saveTryOn(entry: TryOn): Promise<void> {
   const list = await loadHistory();
   const next = [entry, ...list].slice(0, 50);
   await writeJson(HISTORY_KEY, next);
+}
+
+export async function getTryOnById(id: string): Promise<TryOn | null> {
+  const list = await loadHistory();
+  return list.find((t) => t.id === id) ?? null;
+}
+
+/** Patch an existing try-on record (e.g. user edits product name / link). */
+export async function updateTryOn(id: string, patch: Partial<TryOn>): Promise<TryOn[]> {
+  const list = await loadHistory();
+  const next = list.map((t) => (t.id === id ? { ...t, ...patch } : t));
+  await writeJson(HISTORY_KEY, next);
+  return next;
+}
+
+export async function deleteTryOn(id: string): Promise<TryOn[]> {
+  const list = await loadHistory();
+  const next = list.filter((t) => t.id !== id);
+  await writeJson(HISTORY_KEY, next);
+  return next;
 }
 
 export async function loadWishlist(): Promise<WishlistItem[]> {

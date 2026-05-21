@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, AppState, Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import * as MediaLibrary from 'expo-media-library';
-import { Download, Heart, RotateCcw, Share2 } from 'lucide-react-native';
+import { Check, Clock, Download, Heart, RotateCcw, Share2 } from 'lucide-react-native';
 import { Screen } from '../components/Screen';
 import { StepHeader } from '../components/StepHeader';
 import { Button } from '../components/Button';
@@ -248,6 +248,24 @@ export default function ResultScreen() {
           <Thumb uri={productUri} label="Product" onEnlarge={setEnlargedUri} />
         </View>
 
+        {state.kind === 'ok' && (
+          <Pressable
+            onPress={() => router.push('/history')}
+            style={[styles.savedBanner, shadow.card]}
+          >
+            <View style={styles.savedIcon}>
+              <Check size={14} color={colors.primaryOn} strokeWidth={2.6} />
+            </View>
+            <View style={styles.savedText}>
+              <Text style={styles.savedTitle}>Saved to your history</Text>
+              <Text style={styles.savedHint}>
+                Tap to view, add product details, or save to wishlist later
+              </Text>
+            </View>
+            <Clock size={16} color={colors.textFaint} strokeWidth={2} />
+          </Pressable>
+        )}
+
         <View style={styles.cta}>
           {state.kind === 'ok' && (
             <>
@@ -397,6 +415,27 @@ const styles = StyleSheet.create({
   },
   thumbEmpty: { backgroundColor: colors.bgSoft },
   thumbLabel: { ...type.caption, color: colors.textFaint, textAlign: 'center' },
+  savedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.bgSoft,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  savedIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  savedText: { flex: 1, gap: 2 },
+  savedTitle: { ...type.heading, fontSize: 14, color: colors.text },
+  savedHint: { ...type.caption, color: colors.textMuted, fontSize: 12, lineHeight: 16 },
   cta: {
     gap: spacing.sm,
     marginTop: spacing.md,

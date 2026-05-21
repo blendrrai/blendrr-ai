@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { ArrowRight, Droplet, Flower2, RotateCcw, ScanLine, ShieldCheck, Sparkles, Wind } from 'lucide-react-native';
+import { ArrowRight, ChevronRight, Droplet, Flower2, ScanLine, ShieldCheck, Sparkles, Wind } from 'lucide-react-native';
 import { Screen } from '../components/Screen';
 import { StepHeader } from '../components/StepHeader';
 import { colors, radius, shadow, spacing, type, zoneLabels } from '../lib/theme';
-import { useLook } from '../lib/state';
 import {
   loadAnalyses,
   loadHistory,
@@ -18,31 +17,12 @@ import type { ComponentType } from 'react';
 type Tab = 'try-ons' | 'analyses';
 
 export default function HistoryScreen() {
-  const { setSelfie, setProducts, setZone, setMode } = useLook();
   const [tryOns, setTryOns] = useState<TryOn[]>([]);
   const [analyses, setAnalyses] = useState<AnalysisRecord[]>([]);
   const [tab, setTab] = useState<Tab>('try-ons');
 
-  const reuseShade = (item: TryOn) => {
-    Alert.alert(
-      `${zoneLabels[item.zone]} try-on`,
-      'Reuse this shade on a new selfie?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Try again',
-          onPress: () => {
-            setSelfie(null);
-            const uris = item.productUris ?? [item.productUri];
-            const urls = item.productUrls ?? [item.productUrl];
-            setProducts(uris, urls);
-            setZone(item.zone);
-            setMode(item.mode ?? 'single');
-            router.push('/selfie');
-          },
-        },
-      ],
-    );
+  const openTryOn = (item: TryOn) => {
+    router.push({ pathname: '/tryon-detail', params: { id: item.id } });
   };
 
   const refresh = useCallback(() => {
@@ -132,7 +112,7 @@ export default function HistoryScreen() {
           data={tryOns}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
-          renderItem={({ item }) => <TryOnRow item={item} onReuse={() => reuseShade(item)} />}
+          renderItem={({ item }) => <TryOnRow item={item} onOpen={() => openTryOn(item)} />}
           showsVerticalScrollIndicator={false}
         />
       ) : (
@@ -159,19 +139,21 @@ function TabBtn({ label, active, onPress }: { label: string; active: boolean; on
   );
 }
 
-function TryOnRow({ item, onReuse }: { item: TryOn; onReuse: () => void }) {
+function TryOnRow({ item, onOpen }: { item: TryOn; onOpen: () => void }) {
   const preview = item.resultUri ?? item.selfieUri;
   return (
-    <Pressable onPress={onReuse} style={[styles.row, shadow.card]}>
+    <Pressable onPress={onOpen} style={[styles.row, shadow.card]}>
       <Image source={{ uri: preview }} style={styles.rowImage} />
       <View style={styles.rowText}>
-        <Text style={styles.rowTitle}>{zoneLabels[item.zone]} try-on</Text>
+        <Text style={styles.rowTitle}>{item.productName ?? `${zoneLabels[item.zone]} try-on`}</Text>
+        {item.productName && (
+          <Text style={styles.rowSummary} numberOfLines={1}>
+            {zoneLabels[item.zone]}
+          </Text>
+        )}
         <Text style={styles.rowDate}>{formatDate(item.createdAt)}</Text>
       </View>
-      <View style={styles.reuseBtn}>
-        <RotateCcw size={14} color={colors.text} strokeWidth={2} />
-        <Text style={styles.reuseLabel}>Reuse</Text>
-      </View>
+      <ChevronRight size={20} color={colors.textFaint} strokeWidth={2} />
     </Pressable>
   );
 }
