@@ -1,4 +1,5 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { Check, Sparkles, Wand2, Zap } from 'lucide-react-native';
 import Animated, {
@@ -13,6 +14,8 @@ import { Button } from '../components/Button';
 import { colors, radius, shadow, spacing, type } from '../lib/theme';
 import type { Quality } from '../lib/theme';
 import { useLook } from '../lib/state';
+import { startTryOn } from '../lib/blendrr';
+import { canUseCredit } from '../lib/storage';
 
 type IconProps = { size: number; color: string; strokeWidth: number };
 
@@ -51,7 +54,41 @@ const OPTIONS: OptionWithBadge[] = [
 ];
 
 export default function QualityPicker() {
-  const { quality, setQuality } = useLook();
+  const { selfieUri, productUris, zone, mode, quality, setQuality } = useLook();
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleVisualize = async () => {
+    if (!selfieUri || productUris.length === 0) {
+      Alert.alert('Missing inputs', 'Please add a selfie and at least one product.');
+      return;
+    }
+
+    setSubmitting(true);
+    // Up-front check on credits — server enforces this too, but a clean
+    // local check avoids a wasted round-trip.
+    const credit = await canUseCredit();
+    if (!credit.ok) {
+      setSubmitting(false);
+      Alert.alert('Out of credits', credit.reason);
+      return;
+    }
+
+    try {
+      await startTryOn({
+        selfieUri,
+        productUris,
+        zone,
+        mode,
+        quality,
+      });
+      router.push('/result');
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Could not start try-on.';
+      Alert.alert("Couldn't start try-on", message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <Screen>
@@ -79,9 +116,16 @@ export default function QualityPicker() {
 
       <View style={styles.cta}>
         <Button
-          label="Visualize"
-          onPress={() => router.push('/result')}
-          trailing={<Wand2 size={20} color={colors.primaryOn} strokeWidth={2.2} />}
+          label={submitting ? 'Starting…' : 'Visualize'}
+          onPress={handleVisualize}
+          disabled={submitting}
+          trailing={
+            submitting ? (
+              <ActivityIndicator color={colors.primaryOn} size="small" />
+            ) : (
+              <Wand2 size={20} color={colors.primaryOn} strokeWidth={2.2} />
+            )
+          }
         />
       </View>
     </Screen>

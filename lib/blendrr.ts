@@ -1,5 +1,6 @@
 import * as ImageManipulator from 'expo-image-manipulator';
 import { File, Paths } from 'expo-file-system';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { ensureUserId, getCachedUser, updateCachedUser } from './user';
 import type { Zone } from './theme';
@@ -127,13 +128,32 @@ type ShadeInfo = {
   finish: string;
 };
 
-export async function tryOn({
+/** Persisted state for an in-flight try-on. Survives app restarts. */
+export type ActiveTryOnJob = {
+  jobId: string;
+  zone: Zone;
+  mode: 'single' | 'multi';
+  quality: 'medium' | 'ultra';
+  createdAt: number;
+};
+
+const ACTIVE_JOB_KEY = 'blendrr.activeTryOnJob.v1';
+
+/**
+ * Submit a try-on request. Returns immediately with a jobId — the actual AI
+ * generation happens server-side in the background. Use pollTryOnJob() to
+ * fetch progress + result.
+ *
+ * The jobId is persisted to AsyncStorage so a partially-finished try-on can
+ * be recovered after backgrounding, screen unmount, or app restart.
+ */
+export async function startTryOn({
   selfieUri,
   productUris,
   zone,
   mode,
   quality = 'medium',
-}: TryOnInput): Promise<string> {
+}: TryOnInput): Promise<ActiveTryOnJob> {
   if (productUris.length === 0) throw new Error('Add at least one product.');
 
   const [selfieImage, ...productImages] = await Promise.all([
@@ -141,8 +161,6 @@ export async function tryOn({
     ...productUris.map((uri) => uriToBase64(uri, 1024)),
   ]);
 
-  // Server still accepts `productImage` (singular) for back-compat with the
-  // existing single-mode path. For multi we send the array as `productImages`.
   const payload: {
     selfieImage: string;
     productImage?: string;
@@ -150,23 +168,68 @@ export async function tryOn({
     zone: Zone;
     mode: 'single' | 'multi';
     quality: 'medium' | 'ultra';
-  } = {
-    selfieImage,
-    zone,
-    mode,
-    quality,
-  };
+  } = { selfieImage, zone, mode, quality };
   if (mode === 'single') {
     payload.productImage = productImages[0];
   } else {
     payload.productImages = productImages;
   }
 
-  const result = await callEdge<{ imageBase64: string; shade: ShadeInfo | null; quality: 'medium' | 'ultra' }>(
-    'try-on',
-    payload,
-  );
-  return writeImageToDisk(result.imageBase64, 'tryon');
+  const result = await callEdge<{ jobId: string; status: string }>('try-on', payload);
+
+  const job: ActiveTryOnJob = {
+    jobId: result.jobId,
+    zone,
+    mode,
+    quality,
+    createdAt: Date.now(),
+  };
+  await AsyncStorage.setItem(ACTIVE_JOB_KEY, JSON.stringify(job));
+  return job;
+}
+
+export type TryOnJobStatus =
+  | { kind: 'pending' | 'processing' }
+  | { kind: 'complete'; resultUri: string; shade: ShadeInfo | null }
+  | { kind: 'failed'; error: string };
+
+/** Single fetch — returns current status. Caller decides whether to poll again. */
+export async function pollTryOnJob(jobId: string): Promise<TryOnJobStatus> {
+  type JobRow = {
+    id: string;
+    status: 'pending' | 'processing' | 'complete' | 'failed';
+    result_image_base64: string | null;
+    shade: ShadeInfo | null;
+    error: string | null;
+    credits_charged: number;
+  };
+  const job = await callEdge<JobRow>('get-job-status', { jobId });
+  if (job.status === 'pending' || job.status === 'processing') {
+    return { kind: job.status };
+  }
+  if (job.status === 'failed') {
+    return { kind: 'failed', error: job.error ?? 'Try-on failed.' };
+  }
+  // status === 'complete'
+  if (!job.result_image_base64) {
+    return { kind: 'failed', error: 'Job completed without an image.' };
+  }
+  const resultUri = writeImageToDisk(job.result_image_base64, 'tryon');
+  return { kind: 'complete', resultUri, shade: job.shade };
+}
+
+export async function getActiveTryOnJob(): Promise<ActiveTryOnJob | null> {
+  const raw = await AsyncStorage.getItem(ACTIVE_JOB_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as ActiveTryOnJob;
+  } catch {
+    return null;
+  }
+}
+
+export async function clearActiveTryOnJob(): Promise<void> {
+  await AsyncStorage.removeItem(ACTIVE_JOB_KEY);
 }
 
 export type SkinAnalysis = {

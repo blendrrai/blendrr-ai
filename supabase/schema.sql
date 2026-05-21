@@ -61,6 +61,43 @@ alter table public.tryons enable row level security;
 create index if not exists tryons_user_idx on public.tryons(user_id, created_at desc);
 
 -- ============================================================================
+-- TRY-ON JOBS (async processing queue)
+-- The Edge Function creates a row when a try-on is requested, returns the
+-- jobId immediately, and continues the actual AI work via EdgeRuntime.waitUntil.
+-- The client polls this row for completion. Lets users background the app
+-- (lock phone, switch apps) without the request dying.
+-- ============================================================================
+create table if not exists public.tryon_jobs (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null references public.users(id) on delete cascade,
+  status text not null default 'pending',        -- 'pending' | 'processing' | 'complete' | 'failed'
+  task text not null,                             -- 'try-on' (extensible to other long tasks later)
+  result_image_base64 text,                       -- only populated when status = 'complete'
+  shade jsonb,                                    -- extracted shade info for single-product mode
+  credits_charged integer not null,               -- credits deducted up front; refunded if status ends as 'failed'
+  error text,                                     -- populated when status = 'failed'
+  created_at timestamptz not null default now(),
+  started_at timestamptz,                         -- when the worker picked it up
+  completed_at timestamptz                        -- when it reached a terminal status
+);
+
+alter table public.tryon_jobs enable row level security;
+
+-- No client-side policy. All access goes through Edge Functions using service_role
+-- (which bypasses RLS) — the get-job-status task handles the user-scoping check.
+
+create index if not exists tryon_jobs_user_status_idx
+  on public.tryon_jobs(user_id, status, created_at desc);
+
+-- Stale-job cleanup. Run this periodically (e.g. via pg_cron) to prune completed
+-- jobs older than 24h. Result images can be large (base64 PNG), keeping them
+-- around forever bloats the DB.
+-- create extension if not exists pg_cron;
+-- select cron.schedule('cleanup-tryon-jobs', '0 3 * * *',
+--   $$ delete from public.tryon_jobs where status in ('complete', 'failed') and completed_at < now() - interval '24 hours' $$
+-- );
+
+-- ============================================================================
 -- HELPERS
 -- ============================================================================
 

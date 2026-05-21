@@ -894,6 +894,9 @@ Return ONLY this JSON:
 // Main handler
 // ============================================================================
 
+// Tasks that read state without consuming a credit (status checks, etc.)
+const FREE_TASKS = new Set(['get-job-status']);
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -907,7 +910,34 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Load user
+    // ===== get-job-status: free, no credit check, no user verification beyond
+    // ownership check on the job row. Used by client polling.
+    if (task === 'get-job-status') {
+      const jobId = payload?.jobId;
+      if (!jobId) return json({ error: 'Missing jobId' }, 400);
+      const { data: job, error: jobError } = await supabase
+        .from('tryon_jobs')
+        .select('id, status, result_image_base64, shade, error, credits_charged, created_at, completed_at')
+        .eq('id', jobId)
+        .eq('user_id', userId)
+        .single();
+      if (jobError || !job) return json({ error: 'Job not found' }, 404);
+
+      // Always echo current user credits so the client can refresh balance.
+      const { data: u } = await supabase
+        .from('users')
+        .select('credits, tier')
+        .eq('id', userId)
+        .single();
+
+      return json({
+        result: job,
+        credits: u?.credits ?? 0,
+        tier: u?.tier ?? 'free',
+      });
+    }
+
+    // Load user (required for all credit-consuming tasks)
     const { data: user, error: userError } = await supabase
       .from('users')
       .select('id, credits, tier')
@@ -920,7 +950,7 @@ serve(async (req) => {
     //   base                                = 1 credit
     //   + 1 if multi mode (full-face look)  = 2 credits
     //   + 1 if ultra quality                = 3 credits max
-    // Non try-on tasks always cost 1 credit.
+    // Non try-on tasks always cost 1 credit. Free tasks above already returned.
     let creditCost = 1;
     if (task === 'try-on') {
       if (payload?.mode === 'multi') creditCost += 1;
@@ -931,12 +961,102 @@ serve(async (req) => {
       return json({ error: 'Out of credits', credits: user.credits, required: creditCost }, 402);
     }
 
-    // Dispatch
+    // ===== try-on goes async: deduct credits up front, create job row,
+    // continue work via EdgeRuntime.waitUntil, return jobId immediately.
+    if (task === 'try-on') {
+      // Deduct credits up front; refunded by the background worker on failure.
+      const { data: deducted } = await supabase
+        .from('users')
+        .update({ credits: user.credits - creditCost })
+        .eq('id', userId)
+        .select('credits, tier')
+        .single();
+
+      // Create the job row
+      const { data: job, error: jobErr } = await supabase
+        .from('tryon_jobs')
+        .insert({
+          user_id: userId,
+          status: 'pending',
+          task: 'try-on',
+          credits_charged: creditCost,
+        })
+        .select('id')
+        .single();
+
+      if (jobErr || !job) {
+        // Roll back the credit deduction if we couldn't create the job
+        await supabase
+          .from('users')
+          .update({ credits: user.credits })
+          .eq('id', userId);
+        return json({ error: 'Could not create try-on job' }, 500);
+      }
+
+      // Process in the background. Response is sent immediately; this promise
+      // keeps the worker alive past the response until generation completes.
+      // EdgeRuntime.waitUntil is the Supabase Edge Functions equivalent of
+      // Cloudflare Workers' waitUntil — supports long-running background tasks.
+      // @ts-expect-error: EdgeRuntime is provided by the Supabase runtime
+      EdgeRuntime.waitUntil((async () => {
+        try {
+          await supabase
+            .from('tryon_jobs')
+            .update({ status: 'processing', started_at: new Date().toISOString() })
+            .eq('id', job.id);
+
+          const result = await handleTryOn(payload);
+
+          await supabase
+            .from('tryon_jobs')
+            .update({
+              status: 'complete',
+              result_image_base64: result.imageBase64,
+              shade: result.shade,
+              completed_at: new Date().toISOString(),
+            })
+            .eq('id', job.id);
+        } catch (e) {
+          const errMsg = e instanceof Error ? e.message : 'Unknown error';
+          console.log(`[try-on] job ${job.id} failed: ${errMsg}`);
+
+          // Refund credits on failure (re-read user since balance may have
+          // changed between our deduction and the failure)
+          const { data: refundUser } = await supabase
+            .from('users')
+            .select('credits')
+            .eq('id', userId)
+            .single();
+          if (refundUser) {
+            await supabase
+              .from('users')
+              .update({ credits: refundUser.credits + creditCost })
+              .eq('id', userId);
+          }
+
+          await supabase
+            .from('tryon_jobs')
+            .update({
+              status: 'failed',
+              error: errMsg,
+              completed_at: new Date().toISOString(),
+            })
+            .eq('id', job.id);
+        }
+      })());
+
+      // Respond immediately with the jobId. Client polls for completion.
+      return json({
+        result: { jobId: job.id, status: 'pending' },
+        credits: deducted?.credits ?? user.credits - creditCost,
+        tier: deducted?.tier ?? user.tier,
+        creditsCharged: creditCost,
+      });
+    }
+
+    // ===== Synchronous tasks (quizzes, fragrance, ingredient scan, find-products)
     let result: unknown;
     switch (task) {
-      case 'try-on':
-        result = await handleTryOn(payload);
-        break;
       case 'analyze-skin':
         result = await handleAnalyzeSkin(payload);
         break;
@@ -959,7 +1079,7 @@ serve(async (req) => {
         return json({ error: `Unknown task: ${task}` }, 400);
     }
 
-    // Deduct credits on success (variable: 1 for standard, 2 for ultra try-on)
+    // Deduct credits on success for sync tasks
     const { data: updated } = await supabase
       .from('users')
       .update({ credits: user.credits - creditCost })
@@ -979,3 +1099,6 @@ serve(async (req) => {
     return json({ error: message }, status);
   }
 });
+
+// Type-check helper so TypeScript doesn't complain about unused export
+void FREE_TASKS;

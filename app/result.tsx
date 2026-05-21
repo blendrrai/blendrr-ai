@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { Alert, AppState, Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import * as MediaLibrary from 'expo-media-library';
 import { Download, Heart, RotateCcw, Share2 } from 'lucide-react-native';
@@ -10,9 +10,9 @@ import { AiError, AiLoading, NoCredits } from '../components/AiStatus';
 import { EnlargeButton, ImageEnlargerModal } from '../components/ImageEnlarger';
 import { colors, radius, shadow, spacing, type } from '../lib/theme';
 import { useLook } from '../lib/state';
-import { tryOn } from '../lib/blendrr';
-import { canUseCredit, saveTryOn } from '../lib/storage';
-import { consumeCreditWithPrompt } from '../lib/credits';
+import { clearActiveTryOnJob, getActiveTryOnJob, pollTryOnJob } from '../lib/blendrr';
+import { saveTryOn } from '../lib/storage';
+import { refreshUser } from '../lib/user';
 
 type State =
   | { kind: 'loading' }
@@ -28,56 +28,112 @@ export default function ResultScreen() {
   const [enlargedUri, setEnlargedUri] = useState<string | null>(null);
   const [savedToRoll, setSavedToRoll] = useState(false);
   const [addedToWishlist, setAddedToWishlist] = useState(false);
-  const inFlight = useRef(false);
+  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
 
   const productUri = productUris[0] ?? null;
   const productUrl = productUrls[0] ?? null;
 
+  /** Stop any in-flight polling. Safe to call from cleanup. */
+  const stopPolling = useCallback(() => {
+    if (pollTimer.current) {
+      clearTimeout(pollTimer.current);
+      pollTimer.current = null;
+    }
+  }, []);
+
+  /** Single poll tick → schedules the next one if still pending. */
+  const pollOnce = useCallback(
+    async (jobId: string) => {
+      try {
+        const status = await pollTryOnJob(jobId);
+        if (!isMountedRef.current) return;
+
+        switch (status.kind) {
+          case 'pending':
+          case 'processing': {
+            // Keep polling. 2s interval is a reasonable balance — fast enough
+            // for the user to feel responsive, slow enough not to hammer the API.
+            pollTimer.current = setTimeout(() => pollOnce(jobId), 2000);
+            return;
+          }
+          case 'failed': {
+            await clearActiveTryOnJob();
+            // Credits get auto-refunded by the server on failure; refresh local cache.
+            refreshUser().catch(() => {});
+            setState({ kind: 'error', message: status.error });
+            return;
+          }
+          case 'complete': {
+            const resultUri = status.resultUri;
+            await saveTryOn({
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              createdAt: Date.now(),
+              zone,
+              selfieUri: selfieUri ?? '',
+              productUri: productUris[0] ?? '',
+              productUris,
+              productUrl: productUrls[0] ?? null,
+              productUrls,
+              mode,
+              quality,
+              resultUri,
+            });
+            await clearActiveTryOnJob();
+            setState({ kind: 'ok', uri: resultUri });
+            setView('after');
+            return;
+          }
+        }
+      } catch (e) {
+        if (!isMountedRef.current) return;
+        const message = e instanceof Error ? e.message : 'Something went wrong polling the try-on.';
+        // Don't kill the polling immediately on transient errors; retry once.
+        pollTimer.current = setTimeout(() => pollOnce(jobId), 4000);
+        console.warn('[try-on] poll error, retrying in 4s:', message);
+      }
+    },
+    [zone, mode, quality, selfieUri, productUris, productUrls],
+  );
+
+  /** Resume / start polling for the currently active job. */
   const run = useCallback(async () => {
-    if (inFlight.current) return;
-    if (!selfieUri || productUris.length === 0) {
-      setState({ kind: 'error', message: 'Missing selfie or product image.' });
-      return;
-    }
-    inFlight.current = true;
-    setState({ kind: 'loading' });
-
-    const credit = await canUseCredit();
-    if (!credit.ok) {
-      setState({ kind: 'no-credits', reason: credit.reason });
-      inFlight.current = false;
-      return;
-    }
-
-    try {
-      const resultUri = await tryOn({ selfieUri, productUris, zone, mode, quality });
-      await consumeCreditWithPrompt();
-      await saveTryOn({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        createdAt: Date.now(),
-        zone,
-        selfieUri,
-        productUri: productUris[0],
-        productUris,
-        productUrl: productUrls[0] ?? null,
-        productUrls,
-        mode,
-        quality,
-        resultUri,
+    stopPolling();
+    const job = await getActiveTryOnJob();
+    if (!job) {
+      setState({
+        kind: 'error',
+        message: "We couldn't find your try-on in progress. Tap Start over to try again.",
       });
-      setState({ kind: 'ok', uri: resultUri });
-      setView('after');
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Something went wrong.';
-      setState({ kind: 'error', message });
-    } finally {
-      inFlight.current = false;
+      return;
     }
-  }, [selfieUri, productUris, productUrls, zone, mode, quality]);
+    setState({ kind: 'loading' });
+    void pollOnce(job.jobId);
+  }, [pollOnce, stopPolling]);
 
+  // Initial mount: kick off polling
   useEffect(() => {
+    isMountedRef.current = true;
     run();
-  }, [run]);
+    return () => {
+      isMountedRef.current = false;
+      stopPolling();
+    };
+  }, [run, stopPolling]);
+
+  // When the app returns from background, resume polling if we're still
+  // waiting on a result. iOS may have killed the previous poll timer.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') return;
+      // Only resume if we're currently in the loading state — don't restart
+      // for users who already saw their result.
+      if (state.kind === 'loading') {
+        run();
+      }
+    });
+    return () => sub.remove();
+  }, [state.kind, run]);
 
   const saveToRoll = async () => {
     if (state.kind !== 'ok' || saving) return;
