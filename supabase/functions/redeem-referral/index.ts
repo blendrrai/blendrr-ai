@@ -9,9 +9,11 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
-// 1 credit each side. Was 5/3 — too pricey when each try-on can cost up to
-// 3 credits worth of API calls and referrals can chain.
-const INVITEE_REWARD = 1;
+// Inviter (the person who shared the code) gets 1 credit when their code
+// is redeemed. Invitee gets nothing — they already get 2 free signup credits
+// to try the app. This setup gives a real incentive to share without
+// compounding into a chain that drains margins.
+const INVITEE_REWARD = 0;
 const INVITER_REWARD = 1;
 
 const corsHeaders = {

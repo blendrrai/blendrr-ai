@@ -57,7 +57,7 @@ serve(async (req) => {
         id: userId,
         referral_code: referralCode,
         tier: 'free',
-        credits: 5,
+        credits: 2,
         has_redeemed_referral: false,
       })
       .select('id, referral_code, tier, credits, has_redeemed_referral')

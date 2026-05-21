@@ -28,26 +28,26 @@ import {
 const PRO_CREDITS_PER_MONTH = 30;
 
 const PRO_PRICES: Record<Currency, string> = {
-  GBP: '£8.99',
-  USD: '$9.99',
-  EUR: '€9.99',
+  GBP: '£9.99',
+  USD: '$12.99',
+  EUR: '€11.99',
 };
 
 const PACKS: Record<Currency, { credits: number; price: string; badge?: string }[]> = {
   GBP: [
-    { credits: 10, price: '£4.99' },
-    { credits: 30, price: '£11.99', badge: 'Best value' },
-    { credits: 100, price: '£29.99' },
+    { credits: 10, price: '£6.99' },
+    { credits: 30, price: '£12.99', badge: 'Best value' },
+    { credits: 100, price: '£32.99' },
   ],
   USD: [
-    { credits: 10, price: '$4.99' },
-    { credits: 30, price: '$11.99', badge: 'Best value' },
-    { credits: 100, price: '$29.99' },
+    { credits: 10, price: '$8.99' },
+    { credits: 30, price: '$15.99', badge: 'Best value' },
+    { credits: 100, price: '$39.99' },
   ],
   EUR: [
-    { credits: 10, price: '€4.99' },
-    { credits: 30, price: '€11.99', badge: 'Best value' },
-    { credits: 100, price: '€29.99' },
+    { credits: 10, price: '€7.99' },
+    { credits: 30, price: '€14.99', badge: 'Best value' },
+    { credits: 100, price: '€36.99' },
   ],
 };
 
@@ -59,20 +59,22 @@ const PRO_FEATURES = [
 ];
 
 export default function Credits() {
-  const [sub, setSub] = useState<Subscription>({ tier: 'free', credits: 3, currency: 'GBP' });
+  const [sub, setSub] = useState<Subscription>({ tier: 'free', credits: 2, currency: 'GBP' });
   const [user, setUser] = useState<User | null>(getCachedUser());
   const [codeInput, setCodeInput] = useState('');
   const [redeeming, setRedeeming] = useState(false);
 
+  // Always refetch user state from the server — credits can change externally
+  // (admin top-up, future IAP, manual DB edit) and the local cache won't see
+  // those changes until we refresh.
   const refresh = useCallback(() => {
     loadSubscription().then(setSub);
-    setUser(getCachedUser());
-    // If we don't have a user cached, try provisioning. Fails silently if offline.
-    if (!getCachedUser()) {
-      ensureUserProvisioned().catch(() => {
-        // ignore — UI shows "Loading…" until next refresh
+    ensureUserProvisioned()
+      .then((u) => setUser(u))
+      .catch(() => {
+        // Fall back to local cache if offline / network failure
+        setUser(getCachedUser());
       });
-    }
   }, []);
 
   useEffect(() => {
@@ -90,7 +92,7 @@ export default function Credits() {
 
   const shareMyCode = async () => {
     if (!user?.referral_code) return;
-    const message = `Try Blendrr Ai with my code ${user.referral_code} — match shades, build your routine, find your scent. We both get free credits ✨`;
+    const message = `Try Blendrr Ai with my code ${user.referral_code} — match shades, build your routine, find your scent ✨`;
     try {
       await Share.share({ message });
     } catch {
@@ -106,7 +108,7 @@ export default function Credits() {
     setRedeeming(false);
     if (result.ok) {
       setCodeInput('');
-      Alert.alert('Code applied 🎉', 'Free credits added to your account.');
+      Alert.alert('Code applied 🎉', 'Thanks — your friend just got a free credit.');
     } else {
       Alert.alert("Code didn't apply", result.error);
     }
@@ -244,7 +246,7 @@ export default function Credits() {
             <View style={styles.referralHeaderText}>
               <Text style={styles.referralTitle}>Refer a friend</Text>
               <Text style={styles.referralHelper}>
-                You both get credits when they enter your code in onboarding.
+                Earn a free credit each time a friend enters your code.
               </Text>
             </View>
           </View>
@@ -274,7 +276,7 @@ export default function Credits() {
 
           {!user?.has_redeemed_referral && (
             <View style={styles.redeemWrap}>
-              <Text style={styles.redeemLabel}>Got a code from a friend?</Text>
+              <Text style={styles.redeemLabel}>Got a code? Send your friend a thank-you credit</Text>
               <View style={styles.redeemRow}>
                 <TextInput
                   value={codeInput}

@@ -1,11 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LookProvider } from '../lib/state';
 import { colors } from '../lib/theme';
-import { ensureUserProvisioned } from '../lib/user';
+import { ensureUserProvisioned, refreshUser } from '../lib/user';
 
 export default function RootLayout() {
   // Provision an anonymous user (server-side) on first mount. Fires once; the
@@ -15,6 +16,24 @@ export default function RootLayout() {
     ensureUserProvisioned().catch((e) => {
       console.warn('[blendrr] user provisioning failed', e);
     });
+  }, []);
+
+  // Refetch user state from server whenever the app returns from background.
+  // Catches external credit changes (admin top-up, future IAP webhook, manual
+  // DB edits during testing) without requiring a full app restart.
+  const appState = useRef<AppStateStatus>(AppState.currentState);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      const wasBackground = appState.current.match(/inactive|background/);
+      const isActive = next === 'active';
+      appState.current = next;
+      if (wasBackground && isActive) {
+        refreshUser().catch(() => {
+          // ignore — next user-triggered action will retry
+        });
+      }
+    });
+    return () => sub.remove();
   }, []);
 
   return (

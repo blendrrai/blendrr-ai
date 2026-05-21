@@ -57,7 +57,7 @@ export type Subscription = {
   currency: Currency;
 };
 
-const DEFAULT_SUBSCRIPTION: Subscription = { tier: 'free', credits: 3, currency: 'GBP' };
+const DEFAULT_SUBSCRIPTION: Subscription = { tier: 'free', credits: 2, currency: 'GBP' };
 
 export type AppSettings = {
   notificationsEnabled: boolean;
