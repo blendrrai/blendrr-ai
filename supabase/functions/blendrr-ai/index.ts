@@ -990,7 +990,10 @@ serve(async (req) => {
           .from('users')
           .update({ credits: user.credits })
           .eq('id', userId);
-        return json({ error: 'Could not create try-on job' }, 500);
+        console.log(`[try-on] could not create job row:`, jobErr);
+        return json({
+          error: `Could not create try-on job: ${jobErr?.message ?? 'unknown DB error'}`,
+        }, 500);
       }
 
       // Process in the background. Response is sent immediately; this promise
