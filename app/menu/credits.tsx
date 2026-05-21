@@ -31,7 +31,7 @@ const PRO_CREDITS_PER_MONTH = 30;
 const PRO_PRICES: Record<Currency, string> = {
   GBP: '£9.99',
   USD: '$12.99',
-  EUR: '€11.99',
+  EUR: '€12.99',
 };
 
 const PACKS: Record<Currency, { credits: number; price: string; badge?: string }[]> = {
