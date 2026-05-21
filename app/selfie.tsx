@@ -18,6 +18,7 @@ export default function SelfieStep() {
         step="Step 1 of 5"
         title="Drop a selfie"
         subtitle="Front-facing, soft light, hair pulled back if you're trying lips or face shades."
+        showHomeButton
       />
 
       <View style={styles.body}>

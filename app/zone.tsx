@@ -27,6 +27,7 @@ export default function ZoneStep() {
         step="Step 3 of 5"
         title="What are you trying on?"
         subtitle="Pick the product type so we can apply it to the right spot."
+        showHomeButton
       />
 
       <ScrollView

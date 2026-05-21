@@ -50,6 +50,7 @@ export default function ProductStep() {
             ? 'Upload a screenshot or photo of the product you want to try on.'
             : `Up to ${MAX_PRODUCTS_MULTI} products. The AI figures out where each one goes.`
         }
+        showHomeButton
       />
 
       <ScrollView

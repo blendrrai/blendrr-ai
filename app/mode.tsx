@@ -53,6 +53,7 @@ export default function ModeStep() {
         step="Step 2 of 5"
         title="How much are you trying on?"
         subtitle="One product, or a whole look?"
+        showHomeButton
       />
 
       <ScrollView

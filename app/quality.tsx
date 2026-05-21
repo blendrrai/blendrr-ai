@@ -35,7 +35,7 @@ const OPTIONS: OptionWithBadge[] = [
     credits: 1,
     duration: '15–30 seconds',
     Icon: Zap,
-    description: 'Fast preview. Good enough to see how a shade looks on you while browsing.',
+    description: 'Roughly how a shade looks on you. Quick and good enough for browsing.',
     bestFor: 'Best for: browsing, scrolling, trying lots of products quickly.',
   },
   {
@@ -59,6 +59,7 @@ export default function QualityPicker() {
         step="Step 5 of 5"
         title="How sharp should it be?"
         subtitle="Pick a quality. You can change this on every try-on."
+        showHomeButton
       />
 
       <ScrollView
