@@ -16,6 +16,7 @@ import type { Quality } from '../lib/theme';
 import { useLook } from '../lib/state';
 import { startTryOn } from '../lib/blendrr';
 import { canUseCredit } from '../lib/storage';
+import { scheduleTryOnReadyNotification } from '../lib/notifications';
 
 type IconProps = { size: number; color: string; strokeWidth: number };
 
@@ -81,6 +82,10 @@ export default function QualityPicker() {
         mode,
         quality,
       });
+      // Schedule a local notification timed for when the try-on should finish,
+      // so users who swipe out of the app get pinged. Fire-and-forget — if the
+      // permission isn't granted, the schedule silently no-ops.
+      void scheduleTryOnReadyNotification(mode, quality);
       router.push('/result');
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Could not start try-on.';

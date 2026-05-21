@@ -13,6 +13,7 @@ import { useLook } from '../lib/state';
 import { clearActiveTryOnJob, getActiveTryOnJob, pollTryOnJob } from '../lib/blendrr';
 import { saveTryOn } from '../lib/storage';
 import { refreshUser } from '../lib/user';
+import { cancelTryOnReadyNotification } from '../lib/notifications';
 
 type State =
   | { kind: 'loading' }
@@ -59,6 +60,7 @@ export default function ResultScreen() {
           }
           case 'failed': {
             await clearActiveTryOnJob();
+            await cancelTryOnReadyNotification();
             // Credits get auto-refunded by the server on failure; refresh local cache.
             refreshUser().catch(() => {});
             setState({ kind: 'error', message: status.error });
@@ -80,6 +82,7 @@ export default function ResultScreen() {
               resultUri,
             });
             await clearActiveTryOnJob();
+            await cancelTryOnReadyNotification();
             setState({ kind: 'ok', uri: resultUri });
             setView('after');
             return;
