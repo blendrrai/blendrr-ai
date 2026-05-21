@@ -8,15 +8,15 @@ layout: default
 **Effective date: 21 May 2026**
 **Last updated: 21 May 2026**
 
-This Privacy Policy describes how Blendrr Ai ("Blendrr", "we", "us", or "our") collects, uses, and shares information about you when you use the Blendrr Ai mobile application (the "App"). By using the App, you agree to the practices described here.
+This Privacy Policy describes how BLENDRR Ai ("BLENDRR", "we", "us", or "our") collects, uses, and shares information about you when you use the BLENDRR Ai mobile application (the "App"). By using the App, you agree to the practices described here.
 
-**TL;DR**: Blendrr is built privacy-first. We don't ask for your name, email, or any login. Photos you upload are sent to AI providers for processing only and are not stored on our servers or used to train AI models. Your wishlist and history stay on your device.
+**TL;DR**: BLENDRR is built privacy-first. We don't ask for your name, email, or any login. Photos you upload are sent to AI providers for processing only and are not stored on our servers or used to train AI models. Your wishlist and history stay on your device.
 
 ---
 
 ## 1. Who we are
 
-Blendrr Ai is an iOS application that lets you virtually try on cosmetics, build skincare and haircare routines, find fragrances, and check the ingredients of beauty products using AI.
+BLENDRR Ai is an iOS application that lets you virtually try on cosmetics, build skincare and haircare routines, find fragrances, and check the ingredients of beauty products using AI.
 
 If you have questions about this policy or how we handle your data, contact us at:
 
@@ -30,7 +30,7 @@ We collect the minimum amount of information needed to run the App.
 
 ### 2.1 Anonymous device identifier
 
-When you first open Blendrr Ai, we generate a random anonymous identifier (a UUID — for example, `f47ac10b-58cc-4372-a567-0e02b2c3d479`) and store it in your device's secure keychain. This identifier is not linked to your name, email, phone number, or Apple ID. We use it to:
+When you first open BLENDRR Ai, we generate a random anonymous identifier (a UUID — for example, `f47ac10b-58cc-4372-a567-0e02b2c3d479`) and store it in your device's secure keychain. This identifier is not linked to your name, email, phone number, or Apple ID. We use it to:
 
 - Keep track of your credit balance across sessions
 - Issue you a unique referral code
@@ -43,7 +43,7 @@ You can reset this identifier by tapping **Menu → Settings → Clear all app d
 When you use the try-on, skincare, haircare, acne, or ingredient scanner features, you choose photos (selfies, product photos, or screenshots) from your device. These photos:
 
 - Are uploaded to AI providers for processing (see "Third-party services" below)
-- Are **not stored on Blendrr's servers**
+- Are **not stored on BLENDRR's servers**
 - Are **not used to train AI models** (our AI providers have data-sharing settings disabled by default for paid API usage)
 - May be temporarily cached on your device for the duration of the try-on or analysis
 
@@ -55,11 +55,11 @@ When you take the skincare, haircare, acne, or fragrance quizzes, your selection
 
 - Sent to our AI provider (Google Gemini) for analysis
 - Stored locally on your device so you can revisit your routine
-- **Not stored on Blendrr's servers**
+- **Not stored on BLENDRR's servers**
 
 ### 2.4 Wishlist, try-on history, and analyses
 
-Items you save to your wishlist, generated try-ons, and quiz results are stored **only on your device** using the iOS standard storage. They are not transmitted to Blendrr's servers.
+Items you save to your wishlist, generated try-ons, and quiz results are stored **only on your device** using the iOS standard storage. They are not transmitted to BLENDRR's servers.
 
 ### 2.5 Purchase information
 
@@ -128,7 +128,7 @@ All subscriptions and credit purchases are processed by Apple through your Apple
 
 ### 4.5 RevenueCat (subscription management)
 
-RevenueCat receives anonymized purchase events from Apple and tells us when your subscription status changes. They store: your anonymous Blendrr UUID, the products you've purchased, and the timing of those purchases. They do not receive your payment information, name, or email. See https://www.revenuecat.com/privacy
+RevenueCat receives anonymized purchase events from Apple and tells us when your subscription status changes. They store: your anonymous BLENDRR UUID, the products you've purchased, and the timing of those purchases. They do not receive your payment information, name, or email. See https://www.revenuecat.com/privacy
 
 ---
 
@@ -160,7 +160,7 @@ Depending on where you live, you may have the following rights regarding your pe
 - **Restrict** — limit how we process your data
 - **Withdraw consent** — where processing is based on consent
 
-To exercise any of these rights, email us at **blendrr.ai.app@gmail.com**. Because Blendrr does not collect identifying information by default, you may need to provide your anonymous UUID (shown in the App's Settings) to help us locate your record.
+To exercise any of these rights, email us at **blendrr.ai.app@gmail.com**. Because BLENDRR does not collect identifying information by default, you may need to provide your anonymous UUID (shown in the App's Settings) to help us locate your record.
 
 ### UK and EU residents (UK GDPR / GDPR)
 
@@ -180,7 +180,7 @@ If you are a California resident, you have the right to know what categories of 
 
 ## 7. International data transfers
 
-Blendrr is operated from the United Kingdom. Our AI providers (OpenAI, Google) primarily process data in the United States. Supabase hosts our data on servers in the EU. When you use the App, your data may be transferred outside your country of residence. We rely on standard contractual clauses and equivalent safeguards required by UK GDPR / GDPR for these transfers.
+BLENDRR is operated from the United Kingdom. Our AI providers (OpenAI, Google) primarily process data in the United States. Supabase hosts our data on servers in the EU. When you use the App, your data may be transferred outside your country of residence. We rely on standard contractual clauses and equivalent safeguards required by UK GDPR / GDPR for these transfers.
 
 ---
 
@@ -191,7 +191,7 @@ We use industry-standard security measures to protect your data:
 - Encrypted transport (HTTPS / TLS) for all API requests
 - Anonymous identifiers stored in iOS keychain (secure enclave on supported devices)
 - Server-side row-level security on Supabase ensures one user's data cannot be accessed by another
-- No payment information ever passes through Blendrr's servers (Apple handles all payments)
+- No payment information ever passes through BLENDRR's servers (Apple handles all payments)
 
 No system is 100% secure. If we ever become aware of a data breach affecting your information, we will notify affected users in accordance with applicable law.
 
@@ -211,7 +211,7 @@ The App requests the following iOS permissions when needed:
 - **Photo library** — to pick existing photos for selfies or products
 - **Notifications** — to remind you about your routine and tell you when a try-on finishes if you've swiped out of the App
 
-You can grant or revoke any of these in iPhone Settings → Blendrr Ai → at any time. The App continues to work with permissions revoked — you just won't be able to use the corresponding features.
+You can grant or revoke any of these in iPhone Settings → BLENDRR Ai → at any time. The App continues to work with permissions revoked — you just won't be able to use the corresponding features.
 
 ---
 

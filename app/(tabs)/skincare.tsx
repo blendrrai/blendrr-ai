@@ -10,7 +10,7 @@ export default function SkincareTab() {
     <CategoryHome
       eyebrow="Skincare"
       title={'Your skin,\nfigured out.'}
-      subtitle="Answer a few quick questions, snap a selfie, and Blendrr tells you what your routine is missing."
+      subtitle="Answer a few quick questions, snap a selfie, and BLENDRR tells you what your routine is missing."
       Icon={Droplet}
       ctaLabel="Start quiz"
       onStart={() => {

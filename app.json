@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Blendrr Ai",
+    "name": "BLENDRR Ai",
     "slug": "blendrr-ai",
     "scheme": "blendrrai",
     "version": "1.0.0",
@@ -18,9 +18,9 @@
       "bundleIdentifier": "ai.blendrrai.app",
       "buildNumber": "1",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Blendrr Ai needs access to your photo library so you can pick a selfie and product screenshots.",
-        "NSPhotoLibraryAddUsageDescription": "Blendrr Ai saves your AI try-on results to your camera roll.",
-        "NSCameraUsageDescription": "Blendrr Ai uses your camera to take selfies for shade try-ons.",
+        "NSPhotoLibraryUsageDescription": "BLENDRR Ai needs access to your photo library so you can pick a selfie and product screenshots.",
+        "NSPhotoLibraryAddUsageDescription": "BLENDRR Ai saves your AI try-on results to your camera roll.",
+        "NSCameraUsageDescription": "BLENDRR Ai uses your camera to take selfies for shade try-ons.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -46,13 +46,13 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Blendrr Ai to use your camera for selfie try-ons."
+          "cameraPermission": "Allow BLENDRR Ai to use your camera for selfie try-ons."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Blendrr Ai to pick selfies and product screenshots from your library."
+          "photosPermission": "Allow BLENDRR Ai to pick selfies and product screenshots from your library."
         }
       ],
       "expo-secure-store"

@@ -8,13 +8,13 @@ layout: default
 **Effective date: 21 May 2026**
 **Last updated: 21 May 2026**
 
-These Terms of Service ("Terms") govern your use of the Blendrr Ai mobile application ("App"), provided by Blendrr Ai ("Blendrr", "we", "us"). By downloading, installing, or using the App, you agree to these Terms. If you do not agree, do not use the App.
+These Terms of Service ("Terms") govern your use of the BLENDRR Ai mobile application ("App"), provided by BLENDRR Ai ("BLENDRR", "we", "us"). By downloading, installing, or using the App, you agree to these Terms. If you do not agree, do not use the App.
 
 ---
 
 ## 1. About the App
 
-Blendrr Ai uses artificial intelligence to:
+BLENDRR Ai uses artificial intelligence to:
 
 - Generate virtual try-ons of cosmetics on your selfie
 - Recommend skincare, haircare, and acne routines based on your selfie and quiz answers
@@ -52,9 +52,9 @@ New users receive a small number of free credits when they install the App. Free
 
 You can purchase credit packs (e.g. 10, 30, or 100 credits) as one-off in-app purchases. These credits are added to your balance and do not expire. Prices are shown in the App at the time of purchase.
 
-### 4.3 Blendrr Pro (auto-renewing subscription)
+### 4.3 BLENDRR Pro (auto-renewing subscription)
 
-Blendrr Pro is an **auto-renewing monthly subscription** that grants 30 AI credits per month at a discounted per-credit rate.
+BLENDRR Pro is an **auto-renewing monthly subscription** that grants 30 AI credits per month at a discounted per-credit rate.
 
 - **Price**: shown in the App at the time of purchase (e.g. £9.99 per month in the UK)
 - **Billing**: payment is charged to your Apple ID at confirmation of purchase
@@ -72,7 +72,7 @@ Cancelling stops the next renewal but does not refund the current period — you
 
 ### 4.5 Refunds
 
-All purchases are processed by Apple. Refund requests are handled by Apple, not Blendrr. To request a refund, visit https://reportaproblem.apple.com or contact Apple Support.
+All purchases are processed by Apple. Refund requests are handled by Apple, not BLENDRR. To request a refund, visit https://reportaproblem.apple.com or contact Apple Support.
 
 For UK and EU customers: under consumer law, you may have a right to cancel a digital purchase within 14 days. However, by starting to use credits or accessing Pro features, you may be deemed to have waived the right to cancel under Regulation 37(1)(a) of the Consumer Contracts (Information, Cancellation and Additional Charges) Regulations 2013 (or equivalent local law).
 
@@ -104,7 +104,7 @@ The App uses third-party AI models (OpenAI's gpt-image and Google's Gemini) to p
 - **Product recommendations are AI-generated and may be out of date.** Prices, availability, and formulations change. Verify on the retailer's website before purchasing.
 - **Fragrance and ingredient suggestions are not endorsements.** Allergic reactions are possible; always patch-test new products and check the manufacturer's ingredient list.
 
-You use AI-generated content at your own risk. Blendrr is not responsible for purchase decisions, allergic reactions, or other outcomes resulting from your reliance on AI-generated content.
+You use AI-generated content at your own risk. BLENDRR is not responsible for purchase decisions, allergic reactions, or other outcomes resulting from your reliance on AI-generated content.
 
 ---
 
@@ -129,11 +129,11 @@ We may suspend or terminate your access if we suspect abuse, with or without not
 
 ### 7.1 Ours
 
-The App, its design, code, logos, and original content are owned by Blendrr Ai. You may not copy, modify, or distribute any part of the App without our written permission.
+The App, its design, code, logos, and original content are owned by BLENDRR Ai. You may not copy, modify, or distribute any part of the App without our written permission.
 
 ### 7.2 Yours
 
-You retain all rights to the photos you upload. By uploading a photo, you grant Blendrr a limited, worldwide, royalty-free licence to process that photo solely for the purpose of providing the AI feature you requested. We do not claim ownership of your photos.
+You retain all rights to the photos you upload. By uploading a photo, you grant BLENDRR a limited, worldwide, royalty-free licence to process that photo solely for the purpose of providing the AI feature you requested. We do not claim ownership of your photos.
 
 ### 7.3 AI output
 
@@ -147,7 +147,7 @@ Product names, brand names, and logos shown in the App are the property of their
 
 ## 8. Disclaimers
 
-The App is provided **"as is" and "as available"**. To the maximum extent permitted by law, Blendrr disclaims all warranties, express or implied, including but not limited to:
+The App is provided **"as is" and "as available"**. To the maximum extent permitted by law, BLENDRR disclaims all warranties, express or implied, including but not limited to:
 
 - Warranties of merchantability or fitness for a particular purpose
 - Warranties that the App will be uninterrupted, error-free, or secure
@@ -160,7 +160,7 @@ Your use of the App is at your own risk.
 
 ## 9. Limitation of liability
 
-To the maximum extent permitted by law, Blendrr shall not be liable for:
+To the maximum extent permitted by law, BLENDRR shall not be liable for:
 
 - Any indirect, incidental, special, consequential, or punitive damages
 - Loss of profits, data, or goodwill arising from your use of the App
@@ -175,7 +175,7 @@ Nothing in these Terms excludes or limits liability that cannot be excluded unde
 
 ## 10. Indemnification
 
-You agree to defend, indemnify, and hold harmless Blendrr from any claims, damages, or expenses arising from:
+You agree to defend, indemnify, and hold harmless BLENDRR from any claims, damages, or expenses arising from:
 
 - Your violation of these Terms
 - Your misuse of the App
@@ -214,7 +214,7 @@ These Terms are governed by the laws of **England and Wales**, without regard to
 
 If you obtained the App from the Apple App Store, the following apply:
 
-- These Terms are between you and Blendrr only, not Apple. Apple is not responsible for the App or its content.
+- These Terms are between you and BLENDRR only, not Apple. Apple is not responsible for the App or its content.
 - Apple has no obligation to provide maintenance or support for the App.
 - In the event of any failure of the App to conform to any applicable warranty, you may notify Apple, and Apple will refund the purchase price.
 - Apple is not responsible for addressing any claims by you or any third party relating to the App.
@@ -238,4 +238,4 @@ We aim to respond within 7 working days.
 
 ---
 
-By using Blendrr Ai, you confirm you have read and agree to these Terms of Service and our [Privacy Policy](./privacy.html).
+By using BLENDRR Ai, you confirm you have read and agree to these Terms of Service and our [Privacy Policy](./privacy.html).

@@ -146,7 +146,7 @@ export default function ResultScreen() {
       if (perm.status !== 'granted') {
         Alert.alert(
           'Photos access needed',
-          'Allow Blendrr Ai to save to your camera roll in Settings.',
+          'Allow BLENDRR Ai to save to your camera roll in Settings.',
         );
         return;
       }
@@ -165,7 +165,7 @@ export default function ResultScreen() {
     try {
       await Share.share({
         url: state.uri,
-        message: 'Look what I just tried on with Blendrr Ai 💄',
+        message: 'Look what I just tried on with BLENDRR Ai 💄',
       });
     } catch {
       // user cancelled
@@ -198,8 +198,8 @@ export default function ResultScreen() {
   const displayUri = view === 'before' ? selfieUri : state.kind === 'ok' ? state.uri : null;
 
   const loadingHint = quality === 'ultra'
-    ? "Ultra HD try-ons take 40 seconds to 1 minute — we're getting every detail pixel-perfect. You can swipe to another app, but don't close Blendrr."
-    : "This usually takes 15–30 seconds. You can swipe to another app, but don't close Blendrr.";
+    ? "Ultra HD try-ons take 40 seconds to 1 minute — we're getting every detail pixel-perfect. You can swipe to another app, but don't close BLENDRR."
+    : "This usually takes 15–30 seconds. You can swipe to another app, but don't close BLENDRR.";
 
   return (
     <Screen>

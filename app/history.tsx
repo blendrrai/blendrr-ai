@@ -45,7 +45,7 @@ export default function HistoryScreen() {
 
   return (
     <Screen>
-      <StepHeader title="History" subtitle="Everything Blendrr has made for you, kept on this phone." />
+      <StepHeader title="History" subtitle="Everything BLENDRR has made for you, kept on this phone." />
 
       <View style={styles.tabs}>
         <TabBtn

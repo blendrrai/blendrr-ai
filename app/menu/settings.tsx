@@ -78,7 +78,7 @@ export default function Settings() {
       if (!ok) {
         Alert.alert(
           'Notifications off',
-          'Enable notifications for Blendrr in iPhone Settings to receive reminders.',
+          'Enable notifications for BLENDRR in iPhone Settings to receive reminders.',
         );
         return;
       }
@@ -92,7 +92,7 @@ export default function Settings() {
   };
 
   const emailFeedback = () => {
-    const subject = encodeURIComponent('Blendrr Ai feedback');
+    const subject = encodeURIComponent('BLENDRR Ai feedback');
     const body = encodeURIComponent('\n\n---\nVersion: 1.0.0');
     Linking.openURL(`mailto:${FEEDBACK_EMAIL}?subject=${subject}&body=${body}`).catch(() =>
       Alert.alert('No mail app', `Send feedback to ${FEEDBACK_EMAIL}`),
@@ -214,7 +214,7 @@ export default function Settings() {
             <Sparkles size={20} color={colors.text} strokeWidth={1.8} />
           </View>
           <View style={styles.simpleText}>
-            <Text style={styles.simpleTitle}>How Blendrr Ai works</Text>
+            <Text style={styles.simpleTitle}>How BLENDRR Ai works</Text>
             <Text style={styles.simpleSub}>AI, quizzes, privacy, FAQ.</Text>
           </View>
           <ChevronRight size={20} color={colors.textFaint} strokeWidth={2} />
@@ -235,7 +235,7 @@ export default function Settings() {
         <View style={[styles.aboutCard, shadow.card]}>
           <View style={styles.aboutHeader}>
             <Info size={18} color={colors.text} strokeWidth={2} />
-            <Text style={styles.aboutTitle}>About Blendrr Ai</Text>
+            <Text style={styles.aboutTitle}>About BLENDRR Ai</Text>
           </View>
           <Text style={styles.aboutBody}>
             Version 1.0.0. Everything stays on this phone — no account, no cloud.

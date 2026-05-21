@@ -71,7 +71,7 @@ export default function CameraScreen() {
         <View style={styles.permissionCard}>
           <Text style={styles.permissionTitle}>Camera access needed</Text>
           <Text style={styles.permissionBody}>
-            Allow Blendrr to use the camera so you can take selfies for try-ons and analyses.
+            Allow BLENDRR to use the camera so you can take selfies for try-ons and analyses.
           </Text>
           <View style={styles.permissionActions}>
             <Pressable onPress={cancel} style={styles.permissionGhost}>

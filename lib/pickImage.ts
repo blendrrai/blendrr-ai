@@ -13,7 +13,7 @@ async function ensureLibraryPermission(): Promise<boolean> {
 export async function pickFromLibrary(): Promise<string | null> {
   const ok = await ensureLibraryPermission();
   if (!ok) {
-    Alert.alert('Permission needed', 'Blendrr Ai needs photo library access to pick images.');
+    Alert.alert('Permission needed', 'BLENDRR Ai needs photo library access to pick images.');
     return null;
   }
 

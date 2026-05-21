@@ -93,7 +93,7 @@ export default function Credits() {
 
   const shareMyCode = async () => {
     if (!user?.referral_code) return;
-    const message = `Try Blendrr Ai with my code ${user.referral_code} — match shades, build your routine, find your scent ✨`;
+    const message = `Try BLENDRR Ai with my code ${user.referral_code} — match shades, build your routine, find your scent ✨`;
     try {
       await Share.share({ message });
     } catch {
@@ -173,7 +173,7 @@ export default function Credits() {
             </View>
             <View style={styles.heroText}>
               <Text style={[styles.heroEyebrow, isPro && styles.heroEyebrowPro]}>
-                {isPro ? 'Blendrr Pro' : 'Free plan'}
+                {isPro ? 'BLENDRR Pro' : 'Free plan'}
               </Text>
               <Text style={[styles.heroTitle, isPro && styles.heroTitlePro]}>
                 {isPro ? "You're in." : 'Go Pro.'}
@@ -331,7 +331,7 @@ export default function Credits() {
             <Text style={styles.disclosureTitle}>Subscription details</Text>
           </View>
           <Text style={styles.disclosureBody}>
-            <Text style={styles.disclosureStrong}>Blendrr Pro</Text> auto-renews monthly at{' '}
+            <Text style={styles.disclosureStrong}>BLENDRR Pro</Text> auto-renews monthly at{' '}
             <Text style={styles.disclosureStrong}>{proPrice}</Text> until cancelled. Payment is
             charged to your Apple ID at confirmation of purchase.
           </Text>

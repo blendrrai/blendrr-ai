@@ -1,11 +1,11 @@
 ---
-title: Blendrr Ai
+title: BLENDRR Ai
 layout: default
 ---
 
-# Blendrr Ai
+# BLENDRR Ai
 
-Blendrr Ai is an iOS app that uses AI to let you virtually try on cosmetics, build skincare and haircare routines, find fragrances matched to your taste, and check the ingredients of beauty products.
+BLENDRR Ai is an iOS app that uses AI to let you virtually try on cosmetics, build skincare and haircare routines, find fragrances matched to your taste, and check the ingredients of beauty products.
 
 ## Legal
 

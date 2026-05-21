@@ -75,7 +75,7 @@ const ITEMS: Item[] = [
 export default function MenuIndex() {
   return (
     <Screen>
-      <StepHeader title="Menu" subtitle="Everything Blendrr is keeping for you." />
+      <StepHeader title="Menu" subtitle="Everything BLENDRR is keeping for you." />
 
       <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
         {ITEMS.map((item) => (

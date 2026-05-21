@@ -7,11 +7,11 @@ const REMINDER_IDENTIFIER = 'blendrr-reminder';
 const TRYON_NOTIFICATION_KEY = 'blendrr.tryonNotification.v1';
 
 const MESSAGES = [
-  { title: 'Got a shade in mind? 💄', body: 'Drop a screenshot and try it on with Blendrr.' },
+  { title: 'Got a shade in mind? 💄', body: 'Drop a screenshot and try it on with BLENDRR.' },
   { title: 'New look, no commitment ✨', body: "Tap a try-on before you check out — see if it's really you." },
   { title: 'Your routine misses you 🌸', body: 'Quick selfie, fresh recommendations.' },
   { title: 'Scent inspo? 🌷', body: 'Three fragrance picks await — just answer a few questions.' },
-  { title: 'Slay before you pay 💅', body: "Open Blendrr and shop smarter." },
+  { title: 'Slay before you pay 💅', body: "Open BLENDRR and shop smarter." },
 ];
 
 Notifications.setNotificationHandler({

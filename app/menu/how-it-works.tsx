@@ -18,7 +18,7 @@ export default function HowItWorks() {
   return (
     <Screen>
       <StepHeader
-        title="How Blendrr Ai works"
+        title="How BLENDRR Ai works"
         subtitle="The AI, the quizzes, your privacy, and the questions we hear most."
       />
 
@@ -33,7 +33,7 @@ export default function HowItWorks() {
           title="State-of-the-art shade matching"
         >
           <P>
-            Blendrr uses Google's <B>Nano Banana</B> (Gemini 2.5 Flash Image) for try-ons. It's
+            BLENDRR uses Google's <B>Nano Banana</B> (Gemini 2.5 Flash Image) for try-ons. It's
             the same family powering Google's professional creative tools, tuned for
             identity-preserving edits — your face, pose, lighting, and background stay exactly
             as they are.
@@ -97,7 +97,7 @@ export default function HowItWorks() {
           <Bullet
             n="•"
             title="Photos stay local"
-            body="Your selfies, hair photos, and generated try-ons are stored in this app's private storage on your phone only. They're not uploaded to any Blendrr server — we don't have one."
+            body="Your selfies, hair photos, and generated try-ons are stored in this app's private storage on your phone only. They're not uploaded to any BLENDRR server — we don't have one."
           />
           <Bullet
             n="•"
@@ -150,7 +150,7 @@ export default function HowItWorks() {
 
         <Section Icon={ScrollText} eyebrow="More" title="Find a bug, got an idea?">
           <P>
-            Blendrr is being actively built. If something's off or you'd love a feature,
+            BLENDRR is being actively built. If something's off or you'd love a feature,
             send a note via the share sheet from any page — the version, what you were
             doing, and the issue.
           </P>
