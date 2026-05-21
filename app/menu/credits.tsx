@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { Check, Coins, Copy, Crown, Gift, Info, Share2 } from 'lucide-react-native';
@@ -24,6 +24,7 @@ import {
   subscribeUser,
   type User,
 } from '../../lib/user';
+import { LEGAL_URLS } from '../../lib/legal';
 
 const PRO_CREDITS_PER_MONTH = 30;
 
@@ -202,7 +203,28 @@ export default function Credits() {
           </View>
 
           {!isPro ? (
-            <Cta label="Upgrade to Pro" onPress={upgrade} />
+            <>
+              <Cta label="Upgrade to Pro" onPress={upgrade} />
+              <Text style={styles.ctaLegal}>
+                By subscribing you agree to our{' '}
+                <Text
+                  onPress={() => Linking.openURL(LEGAL_URLS.terms)}
+                  style={styles.ctaLegalLink}
+                  suppressHighlighting
+                >
+                  Terms
+                </Text>
+                {' '}and{' '}
+                <Text
+                  onPress={() => Linking.openURL(LEGAL_URLS.privacy)}
+                  style={styles.ctaLegalLink}
+                  suppressHighlighting
+                >
+                  Privacy Policy
+                </Text>
+                .
+              </Text>
+            </>
           ) : (
             <Pressable
               onPress={async () => {
@@ -326,6 +348,24 @@ export default function Credits() {
           <Text style={styles.disclosureFootnote}>
             Credit packs are one-off purchases — no recurring charges. Unused credits do not expire.
           </Text>
+
+          <View style={styles.disclosureLegalRow}>
+            <Text
+              onPress={() => Linking.openURL(LEGAL_URLS.terms)}
+              style={styles.disclosureLegalLink}
+              suppressHighlighting
+            >
+              Terms of Service
+            </Text>
+            <Text style={styles.disclosureLegalSep}>·</Text>
+            <Text
+              onPress={() => Linking.openURL(LEGAL_URLS.privacy)}
+              style={styles.disclosureLegalLink}
+              suppressHighlighting
+            >
+              Privacy Policy
+            </Text>
+          </View>
         </View>
       </ScrollView>
     </Screen>
@@ -444,6 +484,20 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   ctaLabel: { ...type.heading, fontSize: 15, color: colors.primaryOn },
+  ctaLegal: {
+    ...type.caption,
+    fontSize: 11,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    lineHeight: 16,
+  },
+  ctaLegalLink: {
+    color: colors.text,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+    textDecorationColor: colors.borderStrong,
+  },
   resetBtn: {
     paddingVertical: 12,
     alignItems: 'center',
@@ -601,4 +655,22 @@ const styles = StyleSheet.create({
   disclosureBody: { ...type.body, fontSize: 13, color: colors.textMuted, lineHeight: 19 },
   disclosureStrong: { color: colors.text, fontWeight: '700' },
   disclosureFootnote: { ...type.caption, color: colors.textFaint, lineHeight: 18, marginTop: spacing.xs },
+  disclosureLegalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  disclosureLegalLink: {
+    ...type.caption,
+    fontSize: 12,
+    color: colors.text,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+    textDecorationColor: colors.borderStrong,
+  },
+  disclosureLegalSep: { ...type.caption, color: colors.textFaint, fontSize: 12 },
 });

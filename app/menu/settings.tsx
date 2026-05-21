@@ -39,6 +39,7 @@ import {
   ensureNotificationPermission,
   scheduleReminders,
 } from '../../lib/notifications';
+import { LEGAL_URLS } from '../../lib/legal';
 
 const CURRENCY_OPTIONS: { value: Currency; label: string; symbol: string }[] = [
   { value: 'GBP', label: 'British Pound', symbol: '£' },
@@ -239,6 +240,23 @@ export default function Settings() {
           <Text style={styles.aboutBody}>
             Version 1.0.0. Everything stays on this phone — no account, no cloud.
           </Text>
+          <View style={styles.legalRow}>
+            <Text
+              onPress={() => Linking.openURL(LEGAL_URLS.terms)}
+              style={styles.legalLink}
+              suppressHighlighting
+            >
+              Terms of Service
+            </Text>
+            <Text style={styles.legalSeparator}>·</Text>
+            <Text
+              onPress={() => Linking.openURL(LEGAL_URLS.privacy)}
+              style={styles.legalLink}
+              suppressHighlighting
+            >
+              Privacy Policy
+            </Text>
+          </View>
         </View>
       </ScrollView>
     </Screen>
@@ -382,4 +400,18 @@ const styles = StyleSheet.create({
   aboutHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   aboutTitle: { ...type.heading, fontSize: 15, color: colors.text },
   aboutBody: { ...type.caption, color: colors.textMuted, lineHeight: 18 },
+  legalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  legalLink: {
+    ...type.caption,
+    color: colors.textMuted,
+    fontSize: 11,
+    textDecorationLine: 'underline',
+    textDecorationColor: colors.borderStrong,
+  },
+  legalSeparator: { ...type.caption, color: colors.textFaint, fontSize: 11 },
 });
