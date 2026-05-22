@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, AppState, Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import * as MediaLibrary from 'expo-media-library';
-import { Check, Clock, Download, Heart, RotateCcw, Share2 } from 'lucide-react-native';
+import { Check, Clock, Download, Heart, RotateCcw, Share2, Sparkles } from 'lucide-react-native';
 import { Screen } from '../components/Screen';
 import { StepHeader } from '../components/StepHeader';
 import { Button } from '../components/Button';
@@ -16,7 +16,7 @@ import { refreshUser } from '../lib/user';
 import { cancelTryOnReadyNotification } from '../lib/notifications';
 
 type State =
-  | { kind: 'loading' }
+  | { kind: 'loading'; partialUri?: string }
   | { kind: 'ok'; uri: string }
   | { kind: 'error'; message: string }
   | { kind: 'no-credits'; reason: string };
@@ -51,10 +51,18 @@ export default function ResultScreen() {
         if (!isMountedRef.current) return;
 
         switch (status.kind) {
-          case 'pending':
-          case 'processing': {
+          case 'pending': {
             // Keep polling. 2s interval is a reasonable balance — fast enough
             // for the user to feel responsive, slow enough not to hammer the API.
+            pollTimer.current = setTimeout(() => pollOnce(jobId), 2000);
+            return;
+          }
+          case 'processing': {
+            // If a streamed partial preview is available, swap from the
+            // spinner to a live preview. Otherwise keep showing the spinner.
+            if (status.partialUri) {
+              setState({ kind: 'loading', partialUri: status.partialUri });
+            }
             pollTimer.current = setTimeout(() => pollOnce(jobId), 2000);
             return;
           }
@@ -214,11 +222,25 @@ export default function ResultScreen() {
         contentContainerStyle={styles.bodyContent}
         showsVerticalScrollIndicator={false}
       >
-        {state.kind === 'loading' && (
+        {state.kind === 'loading' && !state.partialUri && (
           <AiLoading
             label="Blending your shade…"
             hint={loadingHint}
           />
+        )}
+        {state.kind === 'loading' && state.partialUri && (
+          <View style={[styles.imageCard, shadow.card]}>
+            <Image
+              source={{ uri: state.partialUri }}
+              style={styles.image}
+              resizeMode="cover"
+            />
+            <View style={styles.partialBadge}>
+              <ActivityIndicator size="small" color={colors.primaryOn} />
+              <Sparkles size={14} color={colors.primaryOn} strokeWidth={2.2} />
+              <Text style={styles.partialBadgeText}>Refining…</Text>
+            </View>
+          </View>
         )}
         {state.kind === 'error' && <AiError message={state.message} onRetry={run} />}
         {state.kind === 'no-credits' && <NoCredits reason={state.reason} />}
@@ -396,6 +418,24 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: spacing.md,
     right: spacing.md,
+  },
+  partialBadge: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(10,10,10,0.72)',
+  },
+  partialBadgeText: {
+    ...type.caption,
+    color: colors.primaryOn,
+    fontSize: 12,
+    fontWeight: '600',
   },
   thumbRow: { flexDirection: 'row', gap: spacing.md },
   thumb: { flex: 1, gap: spacing.sm },

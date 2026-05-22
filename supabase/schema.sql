@@ -73,6 +73,7 @@ create table if not exists public.tryon_jobs (
   status text not null default 'pending',        -- 'pending' | 'processing' | 'complete' | 'failed'
   task text not null,                             -- 'try-on' (extensible to other long tasks later)
   result_image_base64 text,                       -- only populated when status = 'complete'
+  partial_image_base64 text,                      -- latest streamed preview frame while status = 'processing'; cleared on complete
   shade jsonb,                                    -- extracted shade info for single-product mode
   credits_charged integer not null,               -- credits deducted up front; refunded if status ends as 'failed'
   error text,                                     -- populated when status = 'failed'
@@ -80,6 +81,10 @@ create table if not exists public.tryon_jobs (
   started_at timestamptz,                         -- when the worker picked it up
   completed_at timestamptz                        -- when it reached a terminal status
 );
+
+-- Migration for existing installs (idempotent — safe to run on a DB that
+-- already has the column).
+alter table public.tryon_jobs add column if not exists partial_image_base64 text;
 
 alter table public.tryon_jobs enable row level security;
 

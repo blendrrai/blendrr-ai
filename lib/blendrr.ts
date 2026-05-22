@@ -189,9 +189,15 @@ export async function startTryOn({
 }
 
 export type TryOnJobStatus =
-  | { kind: 'pending' | 'processing' }
+  | { kind: 'pending' }
+  | { kind: 'processing'; partialUri?: string }
   | { kind: 'complete'; resultUri: string; shade: ShadeInfo | null }
   | { kind: 'failed'; error: string };
+
+// Module-level cache mapping jobId → last persisted partial. We dedupe by
+// base64 string so we don't write the same partial to disk every 2s poll —
+// only when the server has emitted a new preview frame.
+const lastPartialByJob = new Map<string, { b64: string; uri: string }>();
 
 /** Single fetch — returns current status. Caller decides whether to poll again. */
 export async function pollTryOnJob(jobId: string): Promise<TryOnJobStatus> {
@@ -199,14 +205,31 @@ export async function pollTryOnJob(jobId: string): Promise<TryOnJobStatus> {
     id: string;
     status: 'pending' | 'processing' | 'complete' | 'failed';
     result_image_base64: string | null;
+    partial_image_base64: string | null;
     shade: ShadeInfo | null;
     error: string | null;
     credits_charged: number;
   };
   const job = await callEdge<JobRow>('get-job-status', { jobId });
-  if (job.status === 'pending' || job.status === 'processing') {
-    return { kind: job.status };
+
+  if (job.status === 'pending') return { kind: 'pending' };
+
+  if (job.status === 'processing') {
+    if (!job.partial_image_base64) return { kind: 'processing' };
+    const cached = lastPartialByJob.get(jobId);
+    if (cached && cached.b64 === job.partial_image_base64) {
+      // Same partial as last poll — reuse the existing on-disk file.
+      return { kind: 'processing', partialUri: cached.uri };
+    }
+    const uri = writeImageToDisk(job.partial_image_base64, 'tryon-partial');
+    lastPartialByJob.set(jobId, { b64: job.partial_image_base64, uri });
+    return { kind: 'processing', partialUri: uri };
   }
+
+  // Terminal — clear the partial cache so a re-run of this jobId doesn't
+  // return stale URIs (shouldn't happen but cheap to guard against).
+  lastPartialByJob.delete(jobId);
+
   if (job.status === 'failed') {
     return { kind: 'failed', error: job.error ?? 'Try-on failed.' };
   }

@@ -22,6 +22,27 @@ const OPENAI_IMAGE_FALLBACK = 'gpt-image-1';
 // is GA and consistently returns an image (even if quality is lower).
 const GEMINI_IMAGE_FALLBACK = 'gemini-2.5-flash-image';
 
+// ============================================================================
+// IMAGE GENERATION CONFIG (2026-05-22)
+// To revert, restore the PREVIOUS values noted on each line.
+// ============================================================================
+
+// PREVIOUS: routed dynamically — 'medium' for standard, 'high' for ultra HD.
+// Both tiers now collapse to 'low' since the quality difference at iPhone
+// preview resolution is minimal and the cost/speed win is large
+// (~£0.16 high → ~£0.02 low, ~60s → ~15s).
+const IMAGE_QUALITY: 'low' | 'medium' | 'high' = 'low';
+
+// PREVIOUS: false (full image arrived at end of call, no progressive render).
+// Streaming pushes partial preview frames as the model generates so the user
+// sees something within ~3-4s instead of staring at a spinner.
+const ENABLE_STREAMING = true;
+
+// 0-3. PREVIOUS: 0 (no partials).
+// 2 partials = first preview arrives quickly, second is near-final quality,
+// then the real final replaces both.
+const PARTIAL_IMAGES_COUNT = 2;
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -109,6 +130,9 @@ function base64ToBytes(b64: string): Uint8Array {
  *
  * Multi-image: the first image is the canvas being edited; subsequent images
  * are references the model can see (e.g. a product image as a colour reference).
+ *
+ * Streaming: when `stream` is true and `partialImages > 0`, the API emits SSE
+ * events with intermediate preview frames. `onPartial` is called for each one.
  */
 async function callOpenAIImageEdit(opts: {
   model: string;
@@ -116,8 +140,13 @@ async function callOpenAIImageEdit(opts: {
   images: { data: string; mime?: string }[];
   quality?: 'low' | 'medium' | 'high' | 'auto';
   size?: '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+  stream?: boolean;
+  partialImages?: number;
+  onPartial?: (b64: string) => void | Promise<void>;
 }): Promise<string> {
   if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not configured');
+
+  const wantsStreaming = !!opts.stream && (opts.partialImages ?? 0) > 0;
 
   const formData = new FormData();
   formData.append('model', opts.model);
@@ -125,6 +154,10 @@ async function callOpenAIImageEdit(opts: {
   formData.append('n', '1');
   formData.append('size', opts.size ?? 'auto');
   formData.append('quality', opts.quality ?? 'high');
+  if (wantsStreaming) {
+    formData.append('stream', 'true');
+    formData.append('partial_images', String(opts.partialImages));
+  }
 
   opts.images.forEach((img, i) => {
     const bytes = base64ToBytes(img.data);
@@ -148,10 +181,63 @@ async function callOpenAIImageEdit(opts: {
     throw Object.assign(new Error(`OpenAI ${res.status}: ${message}`), { status: res.status });
   }
 
-  const data = await res.json();
-  const b64 = data?.data?.[0]?.b64_json;
-  if (!b64) throw new Error('OpenAI returned no image data');
-  return b64;
+  // Non-streaming path — original behaviour.
+  if (!wantsStreaming) {
+    const data = await res.json();
+    const b64 = data?.data?.[0]?.b64_json;
+    if (!b64) throw new Error('OpenAI returned no image data');
+    return b64;
+  }
+
+  // Streaming path — parse SSE, emit partials, return final.
+  if (!res.body) throw new Error('OpenAI streaming response had no body');
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let finalB64: string | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    // SSE events are newline-delimited. Keep the trailing partial line in
+    // the buffer until the next chunk completes it.
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === '[DONE]') continue;
+      let event: { type?: string; b64_json?: string; data?: { b64_json?: string }[] };
+      try {
+        event = JSON.parse(payload);
+      } catch {
+        continue;
+      }
+      const eventType = event.type ?? '';
+      const b64 = event.b64_json ?? event.data?.[0]?.b64_json;
+      if (!b64) continue;
+      if (eventType.includes('partial_image')) {
+        try {
+          await opts.onPartial?.(b64);
+        } catch (cbErr) {
+          // Don't let a logging/db failure abort the generation
+          console.log(`[openai] onPartial threw: ${cbErr instanceof Error ? cbErr.message : cbErr}`);
+        }
+      } else if (eventType.includes('completed') || eventType.includes('image.generated')) {
+        finalB64 = b64;
+      } else {
+        // Unknown event type that still carries a b64 — keep latest as a
+        // safety net so we don't lose the final image on event-name drift.
+        finalB64 = b64;
+      }
+    }
+  }
+
+  if (!finalB64) throw new Error('OpenAI streaming returned no final image');
+  return finalB64;
 }
 
 // ============================================================================
@@ -506,10 +592,12 @@ async function handleTryOn(payload: {
   zone: Zone;
   mode?: 'single' | 'multi';
   quality?: 'medium' | 'ultra';
-}) {
+}, onPartial?: (b64: string) => void | Promise<void>) {
   const mode: 'single' | 'multi' = payload.mode === 'multi' ? 'multi' : 'single';
   const quality: 'medium' | 'ultra' = payload.quality === 'ultra' ? 'ultra' : 'medium';
-  const openAIQuality: 'medium' | 'high' = quality === 'ultra' ? 'high' : 'medium';
+  // PREVIOUS: const openAIQuality: 'medium' | 'high' = quality === 'ultra' ? 'high' : 'medium';
+  // Both tiers now collapse to IMAGE_QUALITY (currently 'low') — see config block above.
+  const openAIQuality = IMAGE_QUALITY;
 
   // Collect product images. Single mode = 1; multi mode = N (up to 5).
   const productImages: string[] = mode === 'single'
@@ -558,12 +646,15 @@ async function handleTryOn(payload: {
     ...productImages.map((data) => ({ data, mime: 'image/jpeg' })),
   ];
   try {
-    console.log(`[try-on] attempt 1: openai ${OPENAI_IMAGE_MODEL} (${openAIQuality}, mode=${mode}, products=${productImages.length})`);
+    console.log(`[try-on] attempt 1: openai ${OPENAI_IMAGE_MODEL} (${openAIQuality}, mode=${mode}, products=${productImages.length}, stream=${ENABLE_STREAMING})`);
     imageBase64 = await callOpenAIImageEdit({
       model: OPENAI_IMAGE_MODEL,
       prompt: openAIPrompt,
       quality: openAIQuality,
       images: openAIImages,
+      stream: ENABLE_STREAMING,
+      partialImages: PARTIAL_IMAGES_COUNT,
+      onPartial,
     });
   } catch (e) {
     lastError = e instanceof Error ? e.message : 'Unknown error';
@@ -580,12 +671,15 @@ async function handleTryOn(payload: {
   );
   if (!imageBase64 && modelUnavailable) {
     try {
-      console.log(`[try-on] attempt 2: openai ${OPENAI_IMAGE_FALLBACK} (${openAIQuality})`);
+      console.log(`[try-on] attempt 2: openai ${OPENAI_IMAGE_FALLBACK} (${openAIQuality}, stream=${ENABLE_STREAMING})`);
       imageBase64 = await callOpenAIImageEdit({
         model: OPENAI_IMAGE_FALLBACK,
         prompt: openAIPrompt,
         quality: openAIQuality,
         images: openAIImages,
+        stream: ENABLE_STREAMING,
+        partialImages: PARTIAL_IMAGES_COUNT,
+        onPartial,
       });
       lastError = null;
     } catch (e) {
@@ -917,7 +1011,7 @@ serve(async (req) => {
       if (!jobId) return json({ error: 'Missing jobId' }, 400);
       const { data: job, error: jobError } = await supabase
         .from('tryon_jobs')
-        .select('id, status, result_image_base64, shade, error, credits_charged, created_at, completed_at')
+        .select('id, status, result_image_base64, partial_image_base64, shade, error, credits_charged, created_at, completed_at')
         .eq('id', jobId)
         .eq('user_id', userId)
         .single();
@@ -1008,13 +1102,26 @@ serve(async (req) => {
             .update({ status: 'processing', started_at: new Date().toISOString() })
             .eq('id', job.id);
 
-          const result = await handleTryOn(payload);
+          // onPartial: each streamed preview frame from OpenAI gets persisted
+          // to the job row. The client polls and renders the latest partial
+          // until the final image arrives. Fire-and-forget; we don't await
+          // the DB write so it never blocks the generation pipeline.
+          const result = await handleTryOn(payload, (partialB64) => {
+            supabase
+              .from('tryon_jobs')
+              .update({ partial_image_base64: partialB64 })
+              .eq('id', job.id)
+              .then(({ error }) => {
+                if (error) console.log(`[try-on] partial write failed: ${error.message}`);
+              });
+          });
 
           await supabase
             .from('tryon_jobs')
             .update({
               status: 'complete',
               result_image_base64: result.imageBase64,
+              partial_image_base64: null,
               shade: result.shade,
               completed_at: new Date().toISOString(),
             })
