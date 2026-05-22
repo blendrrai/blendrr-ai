@@ -181,8 +181,19 @@ async function callOpenAIImageEdit(opts: {
     throw Object.assign(new Error(`OpenAI ${res.status}: ${message}`), { status: res.status });
   }
 
-  // Non-streaming path — original behaviour.
-  if (!wantsStreaming) {
+  // Detect whether OpenAI honoured our `stream: true` request. If we asked
+  // for streaming but the response is plain JSON, OpenAI silently fell back
+  // to non-streaming — we then just parse as JSON and return the final
+  // (no partials, but the request still succeeds).
+  const contentType = res.headers.get('content-type') ?? '';
+  const isSse = contentType.includes('text/event-stream');
+  console.log(`[openai-edit] model=${opts.model} stream-requested=${wantsStreaming} content-type=${contentType} → ${isSse ? 'SSE' : 'JSON'}`);
+
+  // Non-streaming path — either we didn't ask for it, or OpenAI didn't honour it.
+  if (!wantsStreaming || !isSse) {
+    if (wantsStreaming && !isSse) {
+      console.log(`[openai-edit] WARNING: stream=true was requested but OpenAI returned ${contentType}. No partial frames will fire.`);
+    }
     const data = await res.json();
     const b64 = data?.data?.[0]?.b64_json;
     if (!b64) throw new Error('OpenAI returned no image data');
@@ -214,17 +225,19 @@ async function callOpenAIImageEdit(opts: {
       try {
         event = JSON.parse(payload);
       } catch {
+        console.log(`[openai-edit] SSE: non-JSON data line, skipping: ${payload.slice(0, 80)}`);
         continue;
       }
-      const eventType = event.type ?? '';
+      const eventType = event.type ?? '(no type)';
       const b64 = event.b64_json ?? event.data?.[0]?.b64_json;
+      console.log(`[openai-edit] SSE event: type=${eventType} hasB64=${!!b64} b64Len=${b64?.length ?? 0}`);
       if (!b64) continue;
       if (eventType.includes('partial_image')) {
         try {
           await opts.onPartial?.(b64);
         } catch (cbErr) {
           // Don't let a logging/db failure abort the generation
-          console.log(`[openai] onPartial threw: ${cbErr instanceof Error ? cbErr.message : cbErr}`);
+          console.log(`[openai-edit] onPartial threw: ${cbErr instanceof Error ? cbErr.message : cbErr}`);
         }
       } else if (eventType.includes('completed') || eventType.includes('image.generated')) {
         finalB64 = b64;
