@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
-    marginTop: spacing.xs,
+    marginTop: spacing.md,
     // The hero logo PNG has a pink background and we pull it up with a
     // negative margin to tuck it under the stat row. Without an explicit
     // stacking order the logo paints OVER the icons (later sibling wins by
