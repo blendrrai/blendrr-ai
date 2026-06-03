@@ -110,11 +110,14 @@ const styles = StyleSheet.create({
     minHeight: 88,
   },
   cta: {
-    // marginTop: 'auto' + a fixed paddingBottom pins the CTA to the same
-    // Y across every category tab AND the home tab (which uses the same
-    // recipe). When you swipe between tabs the button stays still.
+    // marginTop: 'auto' + paddingBottom pins the CTA to the same Y across
+    // every category tab AND the home tab. The big paddingBottom lifts the
+    // primary "Start quiz" button well above the floating tab bar so it
+    // matches the home tab's lifted "Start a try-on" button. The optional
+    // secondary CTA (e.g. "Got acne? Try this quiz") sits below the
+    // primary via `gap` — naturally a touch lower than the primary.
     marginTop: 'auto',
-    paddingBottom: 120,
+    paddingBottom: 220,
     alignItems: 'center',
     gap: spacing.md,
   },
