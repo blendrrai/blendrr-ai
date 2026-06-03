@@ -128,8 +128,8 @@ function GlowRingCard({
   color: string;
   onPress: () => void;
 }) {
-  const SIZE = 88;
-  const STROKE = 8;
+  const SIZE = 64;
+  const STROKE = 6;
   const RADIUS = (SIZE - STROKE) / 2;
   const CIRC = 2 * Math.PI * RADIUS;
   const pct = Math.min(1, displayScore / 100);
@@ -242,30 +242,27 @@ const styles = StyleSheet.create({
     zIndex: 1,
     elevation: 1,
   },
-  // Common card shell — top-aligned content so the Trophy / Flame icons (and
-  // the ring on the centre card) all line up at the same Y position.
+  // Common card shell — content is centred so the Trophy / Flame icons sit
+  // on the same Y as the centre of the Glow ring without manual margins.
   statCard: {
     flex: 1,
     backgroundColor: colors.bgSoft,
     borderRadius: radius.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 6,
-    minHeight: 148,
+    justifyContent: 'center',
+    gap: 4,
+    minHeight: 108,
   },
-  // The ring card needs a touch more horizontal room than the side ones so
-  // the circle and the "/100" text don't crowd the edges.
   ringCard: {
-    flex: 1.25,
-    paddingHorizontal: spacing.xs,
+    flex: 1.15,
   },
   ringWrap: {
-    width: 88,
-    height: 88,
+    width: 64,
+    height: 64,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -273,31 +270,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'baseline',
   },
-  ringScore: { ...type.title, fontSize: 22, color: colors.text, lineHeight: 26 },
-  ringScoreDenom: { ...type.caption, color: colors.textFaint, fontSize: 11, fontWeight: '500' },
-  ringLabel: { ...type.caption, color: colors.textMuted, fontWeight: '600', fontSize: 11, textAlign: 'center', marginTop: 'auto' },
-  // Match the ring's outer diameter so the icon centre lines up with the
-  // centre of the ring on the middle card.
+  ringScore: { ...type.title, fontSize: 17, color: colors.text, lineHeight: 20 },
+  ringScoreDenom: { ...type.caption, color: colors.textFaint, fontSize: 9, fontWeight: '500' },
+  ringLabel: { ...type.caption, color: colors.textMuted, fontWeight: '600', fontSize: 10, textAlign: 'center' },
   statIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: colors.bg,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: colors.border,
-    marginTop: 26, // visually centres icon vs the ring on the middle card
   },
-  statValue: { ...type.title, color: colors.text, fontSize: 17, lineHeight: 22, textAlign: 'center', marginTop: 6 },
+  statValue: { ...type.title, color: colors.text, fontSize: 15, lineHeight: 19, textAlign: 'center' },
   statLabel: {
     ...type.caption,
     color: colors.textMuted,
     fontWeight: '600',
-    fontSize: 11,
+    fontSize: 10,
     textAlign: 'center',
-    lineHeight: 14,
-    marginTop: 'auto',
+    lineHeight: 13,
   },
   cta: {
     // Pulled up tight to the subtitle so the button sits just below the
