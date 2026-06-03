@@ -4,6 +4,7 @@ import { AppState, Platform } from 'react-native';
 import type { Mode, Quality } from './theme';
 
 const REMINDER_IDENTIFIER = 'blendrr-reminder';
+const GLOW_IDENTIFIER = 'blendrr-glow-daily';
 const TRYON_NOTIFICATION_KEY = 'blendrr.tryonNotification.v1';
 
 const MESSAGES = [
@@ -13,6 +14,23 @@ const MESSAGES = [
   { title: 'Scent inspo? 🌷', body: 'Three fragrance picks await — just answer a few questions.' },
   { title: 'Slay before you pay 💅', body: "Open BLENDRR and shop smarter." },
 ];
+
+// Daily Glow Score nudges — one per weekday so the body rotates naturally
+// through the week. Fired at 20:00 local time, late enough to give the user
+// a chance to actually have done the thing but early enough they can still
+// tick it off before bed. All end on "girly" by design — friendly, on-brand.
+const GLOW_MESSAGES = [
+  { title: 'Glow check ✨',  body: 'Have you drank your water today, girly? 💧' },
+  { title: 'Glow check ✨',  body: "Don't forget to moisturise tonight, girly 🧴" },
+  { title: 'Glow check ✨',  body: 'Cleanse before bed and let your skin breathe, girly 🛁' },
+  { title: 'Glow check ✨',  body: 'Hope you got your SPF in today, girly ☀️' },
+  { title: 'Glow check ✨',  body: 'Greens, water, glow — got it all in, girly? 🌿' },
+  { title: 'Glow check ✨',  body: 'Keep that streak alive, girly 🔥' },
+  { title: 'Glow check ✨',  body: 'Tick off your daily glow before you sleep, girly 💆' },
+];
+
+const GLOW_HOUR = 20;
+const GLOW_MINUTE = 0;
 
 Notifications.setNotificationHandler({
   handleNotification: async () => {
@@ -41,7 +59,7 @@ export async function ensureNotificationPermission(): Promise<boolean> {
 export async function scheduleReminders(): Promise<void> {
   await cancelReminders();
 
-  // Schedule a reminder every 3 days, 5 occurrences ahead, between 11am-7pm local
+  // 1) Spaced routine nudges — every 3 days, 5 occurrences ahead.
   const now = new Date();
   for (let i = 1; i <= 5; i++) {
     const trigger = new Date(now);
@@ -65,13 +83,38 @@ export async function scheduleReminders(): Promise<void> {
       },
     });
   }
+
+  // 2) Daily Glow Score check-in — 7 weekly-repeating notifications, one per
+  // weekday, so the body cycles through every "girly" prompt across the week.
+  // expo-notifications maps weekday 1 = Sunday … 7 = Saturday.
+  for (let weekday = 1; weekday <= 7; weekday++) {
+    const msg = GLOW_MESSAGES[(weekday - 1) % GLOW_MESSAGES.length];
+    await Notifications.scheduleNotificationAsync({
+      identifier: `${GLOW_IDENTIFIER}-${weekday}`,
+      content: {
+        title: msg.title,
+        body: msg.body,
+        sound: false,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+        weekday,
+        hour: GLOW_HOUR,
+        minute: GLOW_MINUTE,
+      },
+    });
+  }
 }
 
 export async function cancelReminders(): Promise<void> {
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   await Promise.all(
     scheduled
-      .filter((n) => n.identifier.startsWith(REMINDER_IDENTIFIER))
+      .filter(
+        (n) =>
+          n.identifier.startsWith(REMINDER_IDENTIFIER) ||
+          n.identifier.startsWith(GLOW_IDENTIFIER),
+      )
       .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
   );
 }

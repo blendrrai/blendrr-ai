@@ -164,13 +164,15 @@ export default function Settings() {
         <SectionCard
           Icon={Bell}
           title="Reminders"
-          helper="Friendly nudges every few days so you don't forget your routine."
+          helper="A nightly Glow check-in plus the occasional routine nudge — never spammy."
         >
           <View style={styles.toggleRow}>
             <View style={styles.toggleText}>
               <Text style={styles.toggleTitle}>Notifications</Text>
               <Text style={styles.toggleSub}>
-                {settings.notificationsEnabled ? 'On — every 3 days' : 'Off'}
+                {settings.notificationsEnabled
+                  ? 'On — daily glow check-in at 8pm + routine nudges'
+                  : 'Off'}
               </Text>
             </View>
             <Switch
