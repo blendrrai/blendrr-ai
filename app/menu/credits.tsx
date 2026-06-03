@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
-import { Check, Coins, Copy, Crown, Gift, Info, Share2 } from 'lucide-react-native';
+import { Check, Coins, Copy, Crown, Gift, Info, RefreshCw, Share2 } from 'lucide-react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -153,6 +153,38 @@ export default function Credits() {
         },
       },
     ]);
+  };
+
+  const [restoring, setRestoring] = useState(false);
+  const restorePurchases = async () => {
+    if (restoring) return;
+    setRestoring(true);
+    try {
+      // PLACEHOLDER until RevenueCat is wired. Replace this block with:
+      //   const customerInfo = await Purchases.restorePurchases();
+      //   then check customerInfo.entitlements.active for 'pro' and apply.
+      // For now: refresh the server-side user state and show an appropriate
+      // message based on what we already know about this account.
+      const user = await ensureUserProvisioned();
+      if (user.tier === 'pro') {
+        Alert.alert(
+          'Restored',
+          'Your BLENDRR Pro subscription is active on this account.',
+        );
+      } else {
+        Alert.alert(
+          'Nothing to restore',
+          "No active purchases found for this Apple ID. If you've subscribed or bought credits on another device, sign in with the same Apple ID and tap Restore Purchases again.",
+        );
+      }
+    } catch (e) {
+      Alert.alert(
+        "Couldn't restore",
+        e instanceof Error ? e.message : 'Try again in a moment.',
+      );
+    } finally {
+      setRestoring(false);
+    }
   };
 
   const isPro = sub.tier === 'pro';
@@ -367,6 +399,25 @@ export default function Credits() {
             </Text>
           </View>
         </View>
+
+        <Pressable
+          onPress={restorePurchases}
+          disabled={restoring}
+          style={[styles.restoreBtn, restoring && styles.restoreBtnDisabled]}
+          hitSlop={8}
+        >
+          {restoring ? (
+            <ActivityIndicator size="small" color={colors.text} />
+          ) : (
+            <RefreshCw size={14} color={colors.text} strokeWidth={2} />
+          )}
+          <Text style={styles.restoreLabel}>
+            {restoring ? 'Restoring…' : 'Restore Purchases'}
+          </Text>
+        </Pressable>
+        <Text style={styles.restoreHint}>
+          Already bought BLENDRR Pro or credits on this Apple ID? Tap to restore.
+        </Text>
       </ScrollView>
     </Screen>
   );
@@ -673,4 +724,28 @@ const styles = StyleSheet.create({
     textDecorationColor: colors.borderStrong,
   },
   disclosureLegalSep: { ...type.caption, color: colors.textFaint, fontSize: 12 },
+  restoreBtn: {
+    flexDirection: 'row',
+    alignSelf: 'center',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 12,
+    borderRadius: radius.pill,
+    backgroundColor: colors.bgSoft,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    marginTop: spacing.md,
+  },
+  restoreBtnDisabled: { opacity: 0.6 },
+  restoreLabel: { ...type.caption, color: colors.text, fontWeight: '600', fontSize: 13 },
+  restoreHint: {
+    ...type.caption,
+    color: colors.textFaint,
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 6,
+    paddingHorizontal: spacing.lg,
+    lineHeight: 16,
+  },
 });

@@ -2,7 +2,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { File, Paths } from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
-import { ensureUserId, getCachedUser, updateCachedUser } from './user';
+import { ensureUserId, ensureUserProvisioned, getCachedUser, updateCachedUser } from './user';
 import type { Zone } from './theme';
 import type { Answers } from '../components/Questionnaire';
 
@@ -38,40 +38,66 @@ async function extractEdgeError(error: unknown): Promise<string> {
   return message ?? 'Unknown Edge Function error';
 }
 
-async function callEdge<T>(task: string, payload: unknown): Promise<T> {
+async function callEdgeOnce<T>(task: string, payload: unknown): Promise<{ data?: EdgeResponse<T>; rawError?: unknown }> {
   const userId = getCachedUser()?.id ?? (await ensureUserId());
-
   const { data, error } = await supabase.functions.invoke<EdgeResponse<T>>('blendrr-ai', {
     body: { task, userId, payload },
   });
+  if (error) return { rawError: error };
+  return { data: data ?? undefined };
+}
 
-  if (error) {
-    const message = await extractEdgeError(error);
+async function callEdge<T>(task: string, payload: unknown): Promise<T> {
+  let res = await callEdgeOnce<T>(task, payload);
+
+  // Decode the error message (from either the http error or the JSON body's
+  // `error` field) so we can branch on it.
+  const decodeMessage = async (r: typeof res): Promise<string | null> => {
+    if (r.rawError) return extractEdgeError(r.rawError);
+    if (r.data?.error) return r.data.error;
+    return null;
+  };
+
+  let message = await decodeMessage(res);
+
+  // Auto-recover from "User not found" by provisioning the user and retrying
+  // once. This happens when the first-launch provision call silently failed
+  // (network blip) or the user wiped local data and a stale UUID is around.
+  if (message === 'User not found') {
+    try {
+      await ensureUserProvisioned();
+    } catch (provisionErr) {
+      const provisionMsg = provisionErr instanceof Error ? provisionErr.message : 'provision failed';
+      throw new Error(
+        `Your account isn't set up yet. Tried to recover and got: ${provisionMsg}`,
+      );
+    }
+    res = await callEdgeOnce<T>(task, payload);
+    message = await decodeMessage(res);
+  }
+
+  if (message) {
     if (message === 'Out of credits') {
       throw new Error("You're out of credits. Top up or upgrade to Pro to keep going.");
     }
     if (message === 'User not found') {
-      throw new Error('Your account isn\'t set up yet — close the app and reopen to retry.');
+      // Still missing after a fresh provision — something's seriously off.
+      throw new Error("Your account isn't set up yet — close the app and reopen to retry.");
     }
     throw new Error(message);
   }
-  if (!data) throw new Error('Empty response from Edge Function');
-  if (data.error) {
-    if (data.error === 'Out of credits') {
-      throw new Error("You're out of credits. Top up or upgrade to Pro to keep going.");
-    }
-    throw new Error(data.error);
-  }
+
+  if (!res.data) throw new Error('Empty response from Edge Function');
 
   // Server is source of truth for credits/tier — refresh local cache
-  if (typeof data.credits === 'number') {
-    updateCachedUser({ credits: data.credits, ...(data.tier ? { tier: data.tier } : {}) });
+  if (typeof res.data.credits === 'number') {
+    updateCachedUser({ credits: res.data.credits, ...(res.data.tier ? { tier: res.data.tier } : {}) });
   }
 
-  if (data.result === undefined || data.result === null) {
+  if (res.data.result === undefined || res.data.result === null) {
     throw new Error('Edge Function returned no result');
   }
-  return data.result;
+  return res.data.result;
 }
 
 // ============================================================================
