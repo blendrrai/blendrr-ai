@@ -12,6 +12,7 @@ import { router } from 'expo-router';
 import {
   Check,
   Flame,
+  Pencil,
   Plus,
   Sparkles,
   Trash2,
@@ -40,6 +41,7 @@ import {
 export default function GlowScreen() {
   const [state, setState] = useState<GlowState | null>(null);
   const [addingOpen, setAddingOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [newPoints, setNewPoints] = useState('10');
 
@@ -127,18 +129,34 @@ export default function GlowScreen() {
 
         <View style={styles.tasksHeader}>
           <Text style={styles.tasksTitle}>Daily tasks</Text>
-          <Pressable
-            onPress={() => setAddingOpen((v) => !v)}
-            style={styles.addBtn}
-            hitSlop={10}
-          >
-            {addingOpen ? (
-              <X size={16} color={colors.text} strokeWidth={2.2} />
-            ) : (
-              <Plus size={16} color={colors.text} strokeWidth={2.2} />
-            )}
-            <Text style={styles.addBtnLabel}>{addingOpen ? 'Cancel' : 'Add task'}</Text>
-          </Pressable>
+          <View style={styles.tasksHeaderActions}>
+            <Pressable
+              onPress={() => setEditing((v) => !v)}
+              style={[styles.iconBtn, editing && styles.iconBtnActive]}
+              hitSlop={10}
+            >
+              {editing ? (
+                <Check size={16} color={colors.primaryOn} strokeWidth={2.4} />
+              ) : (
+                <Pencil size={14} color={colors.text} strokeWidth={2.2} />
+              )}
+              <Text style={[styles.iconBtnLabel, editing && styles.iconBtnLabelActive]}>
+                {editing ? 'Done' : 'Edit'}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setAddingOpen((v) => !v)}
+              style={styles.iconBtn}
+              hitSlop={10}
+            >
+              {addingOpen ? (
+                <X size={16} color={colors.text} strokeWidth={2.2} />
+              ) : (
+                <Plus size={16} color={colors.text} strokeWidth={2.2} />
+              )}
+              <Text style={styles.iconBtnLabel}>{addingOpen ? 'Cancel' : 'Add'}</Text>
+            </Pressable>
+          </View>
         </View>
 
         {addingOpen && (
@@ -175,36 +193,46 @@ export default function GlowScreen() {
             return (
               <Pressable
                 key={t.id}
-                onPress={() => onToggleTask(t.id)}
-                onLongPress={() => onRemoveTask(t)}
-                style={[styles.taskRow, done && styles.taskRowDone, shadow.card]}
+                onPress={() => {
+                  if (editing) {
+                    onRemoveTask(t);
+                  } else {
+                    onToggleTask(t.id);
+                  }
+                }}
+                style={[styles.taskRow, done && !editing && styles.taskRowDone, shadow.card]}
               >
-                <View style={[styles.checkbox, done && styles.checkboxDone]}>
-                  {done && <Check size={14} color={colors.primaryOn} strokeWidth={3} />}
-                </View>
-                <View style={styles.taskText}>
-                  <Text style={[styles.taskLabel, done && styles.taskLabelDone]}>{t.label}</Text>
-                  <Text style={styles.taskPoints}>+{t.points} pts</Text>
-                </View>
-                {!t.isDefault && (
-                  <Pressable
-                    onPress={() => onRemoveTask(t)}
-                    style={styles.removeBtn}
-                    hitSlop={10}
-                  >
-                    <Trash2 size={14} color={colors.textFaint} strokeWidth={2} />
-                  </Pressable>
+                {editing ? (
+                  <View style={[styles.checkbox, styles.checkboxRemove]}>
+                    <Trash2 size={14} color={colors.primaryOn} strokeWidth={2.4} />
+                  </View>
+                ) : (
+                  <View style={[styles.checkbox, done && styles.checkboxDone]}>
+                    {done && <Check size={14} color={colors.primaryOn} strokeWidth={3} />}
+                  </View>
                 )}
+                <View style={styles.taskText}>
+                  <Text style={[styles.taskLabel, done && !editing && styles.taskLabelDone]}>
+                    {t.label}
+                  </Text>
+                  <Text style={styles.taskPoints}>
+                    +{t.points} pts{t.isDefault ? '' : ' · Custom'}
+                  </Text>
+                </View>
               </Pressable>
             );
           })}
         </View>
 
+        {editing && (
+          <Text style={styles.editHint}>Tap any task to remove it from your daily list.</Text>
+        )}
+
         <View style={[styles.hintCard, shadow.card]}>
-          <Text style={styles.hintTitle}>Tip</Text>
+          <Text style={styles.hintTitle}>How Glow Score works</Text>
           <Text style={styles.hintBody}>
-            Long-press any custom task to remove it. Your score resets at midnight, but your streak
-            keeps building as long as you tick at least one task per day.
+            Your score resets at midnight, but your streak keeps building as long as you tick at
+            least one task per day. Tap Edit to remove tasks, or Add to create your own.
           </Text>
           <Pressable onPress={() => router.push('/menu/achievements')} style={styles.hintCta}>
             <Text style={styles.hintCtaLabel}>See achievements</Text>
@@ -273,8 +301,9 @@ const styles = StyleSheet.create({
   },
   statChipLabel: { ...type.caption, color: colors.primaryOn, fontSize: 11, fontWeight: '600' },
   tasksHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  tasksHeaderActions: { flexDirection: 'row', gap: spacing.xs },
   tasksTitle: { ...type.heading, fontSize: 16, color: colors.text },
-  addBtn: {
+  iconBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -285,7 +314,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderStrong,
   },
-  addBtnLabel: { ...type.caption, color: colors.text, fontWeight: '600' },
+  iconBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  iconBtnLabel: { ...type.caption, color: colors.text, fontWeight: '600' },
+  iconBtnLabelActive: { color: colors.primaryOn },
+  editHint: {
+    ...type.caption,
+    color: colors.textMuted,
+    textAlign: 'center',
+    fontSize: 12,
+    paddingHorizontal: spacing.md,
+  },
   addCard: {
     backgroundColor: colors.bgSoft,
     borderRadius: radius.lg,
@@ -337,11 +375,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
   },
   checkboxDone: { backgroundColor: colors.primary, borderColor: colors.primary },
+  checkboxRemove: { backgroundColor: '#D14A4A', borderColor: '#D14A4A' },
   taskText: { flex: 1, gap: 2 },
   taskLabel: { ...type.body, fontSize: 14, color: colors.text, fontWeight: '500' },
   taskLabelDone: { color: colors.textMuted, textDecorationLine: 'line-through' },
   taskPoints: { ...type.caption, color: colors.textFaint, fontSize: 11 },
-  removeBtn: { padding: 4 },
   hintCard: {
     backgroundColor: colors.bgSoft,
     borderRadius: radius.lg,

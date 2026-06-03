@@ -8,7 +8,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useEffect, useState } from 'react';
-import { ArrowRight, Flame, Sparkles, Trophy } from 'lucide-react-native';
+import { ArrowRight, Flame, Trophy } from 'lucide-react-native';
+import Svg, { Circle } from 'react-native-svg';
 import { Screen } from '../../components/Screen';
 import { Button } from '../../components/Button';
 import { TabHeader } from '../../components/TabHeader';
@@ -17,11 +18,15 @@ import { useLook } from '../../lib/state';
 import {
   ACHIEVEMENTS,
   getCurrentStreak,
+  getTodayMaxScore,
   getTodayScore,
   loadGlow,
   subscribeGlow,
   type GlowState,
 } from '../../lib/glow';
+
+const SCORE_GREEN = '#22A06B';
+const SCORE_RED = '#D14A4A';
 
 const logo = require('../../assets/logo.png');
 
@@ -53,12 +58,36 @@ export default function Landing() {
   };
 
   const score = glow ? getTodayScore(glow) : 0;
+  const maxScore = glow ? getTodayMaxScore(glow) : 100;
   const streak = glow ? getCurrentStreak(glow) : 0;
   const unlocked = glow?.achievements.length ?? 0;
+  const pct = maxScore > 0 ? score / maxScore : 0;
+  const ringColor = pct >= 0.5 ? SCORE_GREEN : SCORE_RED;
 
   return (
     <Screen edges={['top']}>
       <TabHeader />
+
+      <View style={styles.statsRow}>
+        <StatCard
+          label="Achievements"
+          value={`${unlocked}/${ACHIEVEMENTS.length}`}
+          icon={Trophy}
+          onPress={() => router.push('/menu/achievements')}
+        />
+        <GlowRingCard
+          score={score}
+          maxScore={maxScore}
+          color={ringColor}
+          onPress={() => router.push('/menu/glow')}
+        />
+        <StatCard
+          label="Streak"
+          value={`${streak}${streak === 1 ? ' day' : ' days'}`}
+          icon={Flame}
+          onPress={() => router.push('/menu/streak')}
+        />
+      </View>
 
       <View style={styles.hero}>
         <Animated.View style={logoStyle}>
@@ -72,30 +101,6 @@ export default function Landing() {
         </Text>
       </View>
 
-      <View style={styles.statsRow}>
-        <StatCard
-          icon={Sparkles}
-          label="Glow Score"
-          value={score}
-          tint="primary"
-          onPress={() => router.push('/menu/glow')}
-        />
-        <StatCard
-          icon={Trophy}
-          label="Achievements"
-          value={unlocked}
-          suffix={`/${ACHIEVEMENTS.length}`}
-          onPress={() => router.push('/menu/achievements')}
-        />
-        <StatCard
-          icon={Flame}
-          label="Streak"
-          value={streak}
-          suffix={streak === 1 ? ' day' : ' days'}
-          onPress={() => router.push('/menu/streak')}
-        />
-      </View>
-
       <View style={styles.cta}>
         <Button
           label="Start a try-on"
@@ -107,48 +112,78 @@ export default function Landing() {
   );
 }
 
+/**
+ * Circular progress ring for the Glow Score. Stroke goes green at >=50% of
+ * the day's max, red below. Centre shows the raw score number.
+ */
+function GlowRingCard({
+  score,
+  maxScore,
+  color,
+  onPress,
+}: {
+  score: number;
+  maxScore: number;
+  color: string;
+  onPress: () => void;
+}) {
+  const SIZE = 84;
+  const STROKE = 8;
+  const RADIUS = (SIZE - STROKE) / 2;
+  const CIRC = 2 * Math.PI * RADIUS;
+  const pct = maxScore > 0 ? Math.min(1, score / maxScore) : 0;
+  const offset = CIRC * (1 - pct);
+
+  return (
+    <Pressable onPress={onPress} style={[styles.statCard, styles.ringCard, shadow.card]}>
+      <View style={{ width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' }}>
+        <Svg width={SIZE} height={SIZE} style={{ position: 'absolute' }}>
+          <Circle
+            cx={SIZE / 2}
+            cy={SIZE / 2}
+            r={RADIUS}
+            stroke={colors.border}
+            strokeWidth={STROKE}
+            fill="none"
+          />
+          <Circle
+            cx={SIZE / 2}
+            cy={SIZE / 2}
+            r={RADIUS}
+            stroke={color}
+            strokeWidth={STROKE}
+            fill="none"
+            strokeDasharray={CIRC}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
+          />
+        </Svg>
+        <Text style={styles.ringScore}>{score}</Text>
+      </View>
+      <Text style={styles.ringLabel}>Glow Score</Text>
+    </Pressable>
+  );
+}
+
 function StatCard({
   icon: Icon,
   label,
   value,
-  suffix,
-  tint,
   onPress,
 }: {
   icon: React.ComponentType<{ size: number; color: string; strokeWidth: number }>;
   label: string;
-  value: number;
-  suffix?: string;
-  tint?: 'primary';
+  value: string;
   onPress: () => void;
 }) {
-  const isPrimary = tint === 'primary';
   return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        styles.statCard,
-        shadow.card,
-        isPrimary && styles.statCardPrimary,
-      ]}
-    >
-      <View
-        style={[
-          styles.statIconWrap,
-          isPrimary && styles.statIconWrapPrimary,
-        ]}
-      >
-        <Icon
-          size={18}
-          color={isPrimary ? colors.primaryOn : colors.text}
-          strokeWidth={1.8}
-        />
+    <Pressable onPress={onPress} style={[styles.statCard, shadow.card]}>
+      <View style={styles.statIconWrap}>
+        <Icon size={18} color={colors.text} strokeWidth={1.8} />
       </View>
-      <Text style={[styles.statValue, isPrimary && styles.statValuePrimary]}>
-        {value}
-        {suffix && <Text style={[styles.statSuffix, isPrimary && styles.statSuffixPrimary]}>{suffix}</Text>}
-      </Text>
-      <Text style={[styles.statLabel, isPrimary && styles.statLabelPrimary]}>{label}</Text>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
     </Pressable>
   );
 }
@@ -174,9 +209,10 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
-    marginTop: spacing.lg,
+    marginTop: spacing.sm,
   },
   statCard: {
     flex: 1,
@@ -185,13 +221,17 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 6,
+    minHeight: 124,
+    justifyContent: 'center',
   },
-  statCardPrimary: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+  ringCard: {
+    flex: 1.2,
+    paddingVertical: spacing.sm,
   },
+  ringScore: { ...type.title, fontSize: 24, color: colors.text },
+  ringLabel: { ...type.caption, color: colors.textMuted, fontWeight: '600', fontSize: 11, marginTop: 4 },
   statIconWrap: {
     width: 32,
     height: 32,
@@ -202,16 +242,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  statIconWrapPrimary: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  statValue: { ...type.title, color: colors.text, fontSize: 22, lineHeight: 26 },
-  statValuePrimary: { color: colors.primaryOn },
-  statSuffix: { ...type.caption, fontSize: 11, color: colors.textFaint, fontWeight: '500' },
-  statSuffixPrimary: { color: 'rgba(255,255,255,0.85)' },
-  statLabel: { ...type.caption, color: colors.textMuted, fontWeight: '600', fontSize: 11 },
-  statLabelPrimary: { color: 'rgba(255,255,255,0.85)' },
+  statValue: { ...type.title, color: colors.text, fontSize: 17, lineHeight: 22, textAlign: 'center' },
+  statLabel: { ...type.caption, color: colors.textMuted, fontWeight: '600', fontSize: 11, textAlign: 'center' },
   cta: {
     marginTop: spacing.md,
     alignItems: 'center',

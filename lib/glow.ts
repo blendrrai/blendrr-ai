@@ -208,68 +208,103 @@ export function getCachedGlow(): GlowState {
 // Mutations
 // ============================================================================
 
-export async function tickTask(taskId: string, date: string = toLocalDateStr()): Promise<GlowState> {
-  const state = await loadGlow();
-  const task = state.tasks.find((t) => t.id === taskId);
-  if (!task) return state;
+/**
+ * Build a brand-new state object after mutation and swap the cache to it.
+ * React's setState bails out when called with the same reference, so every
+ * mutator MUST produce a fresh top-level object plus fresh arrays/objects
+ * for anything we changed — otherwise the screens won't re-render.
+ */
+function commit(next: GlowState): GlowState {
+  const withStreak: GlowState = {
+    ...next,
+    streakLongest: Math.max(next.streakLongest, getCurrentStreak(next)),
+  };
+  cached = withStreak;
+  return withStreak;
+}
 
-  const existing = state.history.find((d) => d.date === date);
+export async function tickTask(taskId: string, date: string = toLocalDateStr()): Promise<GlowState> {
+  const prev = await loadGlow();
+  const task = prev.tasks.find((t) => t.id === taskId);
+  if (!task) return prev;
+
+  const existing = prev.history.find((d) => d.date === date);
+  let history: GlowDay[];
   if (existing) {
-    if (existing.completedTaskIds.includes(taskId)) return state; // already ticked
-    existing.completedTaskIds = [...existing.completedTaskIds, taskId];
-    existing.score = recomputeScore(state.tasks, existing.completedTaskIds);
+    if (existing.completedTaskIds.includes(taskId)) return prev; // already ticked
+    const completedTaskIds = [...existing.completedTaskIds, taskId];
+    const updated: GlowDay = {
+      ...existing,
+      completedTaskIds,
+      score: recomputeScore(prev.tasks, completedTaskIds),
+    };
+    history = prev.history.map((d) => (d.date === date ? updated : d));
   } else {
-    state.history = [
+    history = [
       { date, completedTaskIds: [taskId], score: task.points },
-      ...state.history,
+      ...prev.history,
     ].slice(0, 365);
   }
-  recomputeStreakLongest(state);
+  const next = commit({ ...prev, history });
   await persist();
   await checkAchievements();
-  return state;
+  return next;
 }
 
 export async function untickTask(taskId: string, date: string = toLocalDateStr()): Promise<GlowState> {
-  const state = await loadGlow();
-  const day = state.history.find((d) => d.date === date);
-  if (!day) return state;
-  day.completedTaskIds = day.completedTaskIds.filter((id) => id !== taskId);
-  day.score = recomputeScore(state.tasks, day.completedTaskIds);
-  // Drop the day entry if it ended up empty so it doesn't break streaks.
-  if (day.completedTaskIds.length === 0) {
-    state.history = state.history.filter((d) => d.date !== date);
+  const prev = await loadGlow();
+  const day = prev.history.find((d) => d.date === date);
+  if (!day) return prev;
+  const completedTaskIds = day.completedTaskIds.filter((id) => id !== taskId);
+  let history: GlowDay[];
+  if (completedTaskIds.length === 0) {
+    // Drop the day entry so it doesn't break streaks.
+    history = prev.history.filter((d) => d.date !== date);
+  } else {
+    const updated: GlowDay = {
+      ...day,
+      completedTaskIds,
+      score: recomputeScore(prev.tasks, completedTaskIds),
+    };
+    history = prev.history.map((d) => (d.date === date ? updated : d));
   }
-  recomputeStreakLongest(state);
+  const next = commit({ ...prev, history });
   await persist();
-  return state;
+  return next;
 }
 
 export async function addCustomTask(label: string, points: number): Promise<GlowState> {
-  const state = await loadGlow();
+  const prev = await loadGlow();
   const trimmed = label.trim();
-  if (!trimmed) return state;
+  if (!trimmed) return prev;
   const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  state.tasks = [...state.tasks, { id, label: trimmed, points: clampPoints(points), isDefault: false }];
+  const tasks = [
+    ...prev.tasks,
+    { id, label: trimmed, points: clampPoints(points), isDefault: false },
+  ];
+  const next = commit({ ...prev, tasks });
   await persist();
   await checkAchievements();
-  return state;
+  return next;
 }
 
 export async function removeTask(taskId: string): Promise<GlowState> {
-  const state = await loadGlow();
-  state.tasks = state.tasks.filter((t) => t.id !== taskId);
-  // Also strip the task from any history entries (and recompute scores).
-  state.history = state.history
-    .map((d) => ({
-      ...d,
-      completedTaskIds: d.completedTaskIds.filter((id) => id !== taskId),
-      score: recomputeScore(state.tasks, d.completedTaskIds.filter((id) => id !== taskId)),
-    }))
+  const prev = await loadGlow();
+  const tasks = prev.tasks.filter((t) => t.id !== taskId);
+  // Strip the task from history and recompute each day's score.
+  const history = prev.history
+    .map((d) => {
+      const completedTaskIds = d.completedTaskIds.filter((id) => id !== taskId);
+      return {
+        ...d,
+        completedTaskIds,
+        score: recomputeScore(tasks, completedTaskIds),
+      };
+    })
     .filter((d) => d.completedTaskIds.length > 0);
-  recomputeStreakLongest(state);
+  const next = commit({ ...prev, tasks, history });
   await persist();
-  return state;
+  return next;
 }
 
 function clampPoints(p: number): number {
@@ -318,10 +353,6 @@ export function getCurrentStreak(state: GlowState = getCachedGlow()): number {
   return count;
 }
 
-function recomputeStreakLongest(state: GlowState) {
-  const current = getCurrentStreak(state);
-  if (current > state.streakLongest) state.streakLongest = current;
-}
 
 /** Number of consecutive days (ending today or yesterday) with score >= threshold. */
 export function consecutiveDaysAtOrAbove(threshold: number, state: GlowState = getCachedGlow()): number {
@@ -399,18 +430,20 @@ function check(id: AchievementId, ctx: AchievementContext): boolean {
  * Returns the list of newly-unlocked achievements (for "toast" UI later).
  */
 export async function checkAchievements(): Promise<Achievement[]> {
-  const state = await loadGlow();
-  const ctx = await buildContext(state);
-  const unlocked = new Set(state.achievements.map((a) => a.id));
+  const prev = await loadGlow();
+  const ctx = await buildContext(prev);
+  const unlocked = new Set(prev.achievements.map((a) => a.id));
   const newly: Achievement[] = [];
+  const additions: UnlockedAchievement[] = [];
   for (const a of ACHIEVEMENTS) {
     if (unlocked.has(a.id)) continue;
     if (check(a.id, { ...ctx, unlockedCount: unlocked.size + newly.length })) {
-      state.achievements.push({ id: a.id, unlockedAt: Date.now() });
+      additions.push({ id: a.id, unlockedAt: Date.now() });
       newly.push(a);
     }
   }
-  if (newly.length > 0) {
+  if (additions.length > 0) {
+    commit({ ...prev, achievements: [...prev.achievements, ...additions] });
     await persist();
   }
   return newly;
@@ -418,9 +451,12 @@ export async function checkAchievements(): Promise<Achievement[]> {
 
 /** Manually unlock — used for events that aren't visible to check() like sharing. */
 export async function unlockAchievement(id: AchievementId): Promise<Achievement | null> {
-  const state = await loadGlow();
-  if (state.achievements.some((a) => a.id === id)) return null;
-  state.achievements.push({ id, unlockedAt: Date.now() });
+  const prev = await loadGlow();
+  if (prev.achievements.some((a) => a.id === id)) return null;
+  commit({
+    ...prev,
+    achievements: [...prev.achievements, { id, unlockedAt: Date.now() }],
+  });
   await persist();
   return ACHIEVEMENTS.find((a) => a.id === id) ?? null;
 }
