@@ -33,10 +33,9 @@ export default function HowItWorks() {
           title="State-of-the-art shade matching"
         >
           <P>
-            BLENDRR uses Google's <B>Nano Banana</B> (Gemini 2.5 Flash Image) for try-ons. It's
-            the same family powering Google's professional creative tools, tuned for
-            identity-preserving edits — your face, pose, lighting, and background stay exactly
-            as they are.
+            BLENDRR uses a <B>state-of-the-art image AI</B> tuned for identity-preserving
+            edits — your face, pose, lighting, and background stay exactly as they are, only
+            the shade or finish you asked for changes.
           </P>
           <P>
             Before applying anything, we run a two-step shade analysis:
@@ -72,15 +71,15 @@ export default function HowItWorks() {
             type, concerns, habits, climate, and (for fragrance) scent families and mood.
           </P>
           <P>
-            For skincare and haircare, you also add a photo. Gemini's vision model reads what's
-            on your face or in your hair — texture, signs of dryness, frizz, undertone — and
+            For skincare and haircare, you also add a photo. Our vision AI reads what's on
+            your face or in your hair — texture, signs of dryness, frizz, undertone — and
             combines that with your answers to suggest a routine that's actually personalised.
             Not a generic checklist.
           </P>
           <P>
-            For fragrance, we use Gemini with <B>live Google Search grounding</B> — so
-            recommendations include currently trending and recently-released bottles, not
-            whatever the model trained on a year ago.
+            For fragrance, our AI runs with <B>live web search</B> — so recommendations
+            include currently trending and recently-released bottles, not whatever a model
+            trained on a year ago.
           </P>
           <P>
             Each analysis costs 1 credit. Pro members get 30 credits a month shared across all
@@ -101,8 +100,8 @@ export default function HowItWorks() {
           />
           <Bullet
             n="•"
-            title="What Google sees"
-            body="Photos are sent to Google's Gemini API only when you tap a quiz or try-on — for the few seconds the AI is generating. Google processes them and does not store them or use them for training (per their Gemini API terms)."
+            title="What our AI sees"
+            body="Photos are sent to our AI providers only when you tap a quiz or try-on — for the few seconds the AI is generating. They process them and do not store them or use them for training. See our Privacy Policy for the full list of providers and their data terms."
           />
           <Bullet
             n="•"
@@ -138,7 +137,7 @@ export default function HowItWorks() {
             re-generating, copying or sharing — all free.
           </Faq>
           <Faq q="Why does the fragrance section know what's trending?">
-            We give Gemini access to live Google Search when running fragrance discovery, so
+            We give our AI access to live web search when running fragrance discovery, so
             it can pull current TikTok-viral and recently-released picks instead of relying
             on its training data.
           </Faq>

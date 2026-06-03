@@ -94,7 +94,7 @@ export function isNotificationsSupported(): boolean {
  * Used to schedule the "your try-on is ready" notification — we want it to
  * fire approximately when the work finishes, not 10 seconds early/late.
  *
- * Numbers are based on observed OpenAI gpt-image latency:
+ * Numbers are based on observed try-on image-model latency:
  *   medium quality:  ~20s for single, ~25s for multi
  *   ultra (high):    ~45s for single, ~55s for multi
  * Add a 5s buffer so the notification fires *after* completion rather than
