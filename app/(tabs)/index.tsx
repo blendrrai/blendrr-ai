@@ -195,12 +195,6 @@ function StatCard({
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    alignItems: 'center',
-    gap: 2,
-    paddingTop: 0,
-    marginTop: -spacing.xs,
-  },
   logo: {
     width: 220,
     height: 220,
@@ -221,6 +215,20 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
     marginTop: spacing.xs,
+    // The hero logo PNG has a pink background and we pull it up with a
+    // negative margin to tuck it under the stat row. Without an explicit
+    // stacking order the logo paints OVER the icons (later sibling wins by
+    // default in RN). Force the cards to render above the logo.
+    zIndex: 2,
+    elevation: 2, // Android counterpart
+  },
+  hero: {
+    alignItems: 'center',
+    gap: 2,
+    paddingTop: 0,
+    marginTop: -spacing.xs,
+    zIndex: 1,
+    elevation: 1,
   },
   // Common card shell — top-aligned content so the Trophy / Flame icons (and
   // the ring on the centre card) all line up at the same Y position.
