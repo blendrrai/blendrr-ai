@@ -70,13 +70,20 @@ export function CategoryHome({
           onPress={onStart}
           trailing={<ArrowRight size={20} color={colors.primaryOn} strokeWidth={2.4} />}
         />
-        {secondaryCta && (
+      </View>
+
+      {/* Secondary CTA (e.g. "Got acne?" on the skincare tab) is positioned
+          absolutely so its presence doesn't lift the primary button — the
+          primary stays at the same Y on every tab whether or not a
+          secondary exists. */}
+      {secondaryCta && (
+        <View style={styles.secondaryWrap}>
           <Pressable onPress={secondaryCta.onPress} style={styles.secondaryBtn}>
             <Text style={styles.secondaryLabel}>{secondaryCta.label}</Text>
             <ArrowRight size={16} color={colors.text} strokeWidth={2.2} />
           </Pressable>
-        )}
-      </View>
+        </View>
+      )}
     </Screen>
   );
 }
@@ -110,16 +117,22 @@ const styles = StyleSheet.create({
     minHeight: 88,
   },
   cta: {
-    // marginTop: 'auto' + paddingBottom pins the CTA to the same Y across
-    // every category tab AND the home tab. The big paddingBottom lifts the
-    // primary "Start quiz" button well above the floating tab bar so it
-    // matches the home tab's lifted "Start a try-on" button. The optional
-    // secondary CTA (e.g. "Got acne? Try this quiz") sits below the
-    // primary via `gap` — naturally a touch lower than the primary.
+    // marginTop: 'auto' + matching paddingBottom pins the primary CTA to
+    // the same Y across every tab. MUST match `cta.paddingBottom` in
+    // app/(tabs)/index.tsx — change them together or buttons drift.
     marginTop: 'auto',
-    paddingBottom: 220,
+    paddingBottom: 180,
     alignItems: 'center',
-    gap: spacing.md,
+  },
+  // Absolutely positioned so it sits below the primary CTA without
+  // displacing it. bottom: 110 = 70px below where the primary's bottom
+  // edge sits, leaving a comfortable ~30px gap between the two buttons.
+  secondaryWrap: {
+    position: 'absolute',
+    bottom: 110,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
   secondaryBtn: {
     flexDirection: 'row',

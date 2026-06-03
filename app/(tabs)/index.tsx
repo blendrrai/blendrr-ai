@@ -295,11 +295,10 @@ const styles = StyleSheet.create({
   cta: {
     // Push to the bottom of the screen with flex:auto so the "Start a try-on"
     // button lines up with the equivalent button on the Skin / Hair / Scent
-    // / Scan tabs (which use the same trick in CategoryHome). Big
-    // paddingBottom lifts the button well above the floating tab bar so it
-    // sits in the lower-middle of the screen rather than at the bottom.
+    // / Scan tabs. paddingBottom keeps it lifted above the floating tab bar.
+    // Must match `cta.paddingBottom` in components/CategoryHome.tsx exactly.
     marginTop: 'auto',
-    paddingBottom: 220,
+    paddingBottom: 180,
     alignItems: 'center',
     zIndex: 3,
     elevation: 3,
