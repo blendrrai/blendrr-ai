@@ -61,7 +61,11 @@ export default function Landing() {
   const maxScore = glow ? getTodayMaxScore(glow) : 100;
   const streak = glow ? getCurrentStreak(glow) : 0;
   const unlocked = glow?.achievements.length ?? 0;
-  const pct = maxScore > 0 ? score / maxScore : 0;
+  // Display always normalises to "X/100" regardless of the user's actual
+  // task total. For the default 8-task config max=100 so display=score; for
+  // custom configs we project onto a 100-scale so the number reads the same.
+  const displayScore = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
+  const pct = displayScore / 100;
   const ringColor = pct >= 0.5 ? SCORE_GREEN : SCORE_RED;
 
   return (
@@ -70,19 +74,18 @@ export default function Landing() {
 
       <View style={styles.statsRow}>
         <StatCard
-          label="Achievements"
+          label={'Badges\nUnlocked'}
           value={`${unlocked}/${ACHIEVEMENTS.length}`}
           icon={Trophy}
           onPress={() => router.push('/menu/achievements')}
         />
         <GlowRingCard
-          score={score}
-          maxScore={maxScore}
+          displayScore={displayScore}
           color={ringColor}
           onPress={() => router.push('/menu/glow')}
         />
         <StatCard
-          label="Streak"
+          label={'Daily\nStreak'}
           value={`${streak}${streak === 1 ? ' day' : ' days'}`}
           icon={Flame}
           onPress={() => router.push('/menu/streak')}
@@ -113,30 +116,28 @@ export default function Landing() {
 }
 
 /**
- * Circular progress ring for the Glow Score. Stroke goes green at >=50% of
- * the day's max, red below. Centre shows the raw score number.
+ * Circular progress ring for the Glow Score. Stroke goes green at >=50%,
+ * red below. Centre shows the normalised score as "X/100".
  */
 function GlowRingCard({
-  score,
-  maxScore,
+  displayScore,
   color,
   onPress,
 }: {
-  score: number;
-  maxScore: number;
+  displayScore: number;
   color: string;
   onPress: () => void;
 }) {
-  const SIZE = 84;
+  const SIZE = 88;
   const STROKE = 8;
   const RADIUS = (SIZE - STROKE) / 2;
   const CIRC = 2 * Math.PI * RADIUS;
-  const pct = maxScore > 0 ? Math.min(1, score / maxScore) : 0;
+  const pct = Math.min(1, displayScore / 100);
   const offset = CIRC * (1 - pct);
 
   return (
     <Pressable onPress={onPress} style={[styles.statCard, styles.ringCard, shadow.card]}>
-      <View style={{ width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={styles.ringWrap}>
         <Svg width={SIZE} height={SIZE} style={{ position: 'absolute' }}>
           <Circle
             cx={SIZE / 2}
@@ -159,7 +160,10 @@ function GlowRingCard({
             transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
           />
         </Svg>
-        <Text style={styles.ringScore}>{score}</Text>
+        <View style={styles.ringCentre}>
+          <Text style={styles.ringScore}>{displayScore}</Text>
+          <Text style={styles.ringScoreDenom}>/100</Text>
+        </View>
       </View>
       <Text style={styles.ringLabel}>Glow Score</Text>
     </Pressable>
@@ -180,10 +184,12 @@ function StatCard({
   return (
     <Pressable onPress={onPress} style={[styles.statCard, shadow.card]}>
       <View style={styles.statIconWrap}>
-        <Icon size={18} color={colors.text} strokeWidth={1.8} />
+        <Icon size={20} color={colors.text} strokeWidth={1.8} />
       </View>
       <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statLabel} numberOfLines={2}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -191,14 +197,16 @@ function StatCard({
 const styles = StyleSheet.create({
   hero: {
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingTop: spacing.md,
+    gap: 2,
+    paddingTop: 0,
+    marginTop: -spacing.xs,
   },
   logo: {
-    width: 240,
-    height: 240,
+    width: 220,
+    height: 220,
+    marginTop: -spacing.sm,
   },
-  title: { ...type.display, color: colors.text, textAlign: 'center' },
+  title: { ...type.display, color: colors.text, textAlign: 'center', marginTop: -spacing.sm },
   subtitle: {
     ...type.body,
     color: colors.textMuted,
@@ -209,41 +217,68 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
   },
+  // Common card shell — top-aligned content so the Trophy / Flame icons (and
+  // the ring on the centre card) all line up at the same Y position.
   statCard: {
     flex: 1,
     backgroundColor: colors.bgSoft,
     borderRadius: radius.lg,
-    padding: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
+    justifyContent: 'flex-start',
     gap: 6,
-    minHeight: 124,
+    minHeight: 148,
+  },
+  // The ring card needs a touch more horizontal room than the side ones so
+  // the circle and the "/100" text don't crowd the edges.
+  ringCard: {
+    flex: 1.25,
+    paddingHorizontal: spacing.xs,
+  },
+  ringWrap: {
+    width: 88,
+    height: 88,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  ringCard: {
-    flex: 1.2,
-    paddingVertical: spacing.sm,
+  ringCentre: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
   },
-  ringScore: { ...type.title, fontSize: 24, color: colors.text },
-  ringLabel: { ...type.caption, color: colors.textMuted, fontWeight: '600', fontSize: 11, marginTop: 4 },
+  ringScore: { ...type.title, fontSize: 22, color: colors.text, lineHeight: 26 },
+  ringScoreDenom: { ...type.caption, color: colors.textFaint, fontSize: 11, fontWeight: '500' },
+  ringLabel: { ...type.caption, color: colors.textMuted, fontWeight: '600', fontSize: 11, textAlign: 'center', marginTop: 'auto' },
+  // Match the ring's outer diameter so the icon centre lines up with the
+  // centre of the ring on the middle card.
   statIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: colors.bg,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: colors.border,
+    marginTop: 26, // visually centres icon vs the ring on the middle card
   },
-  statValue: { ...type.title, color: colors.text, fontSize: 17, lineHeight: 22, textAlign: 'center' },
-  statLabel: { ...type.caption, color: colors.textMuted, fontWeight: '600', fontSize: 11, textAlign: 'center' },
+  statValue: { ...type.title, color: colors.text, fontSize: 17, lineHeight: 22, textAlign: 'center', marginTop: 6 },
+  statLabel: {
+    ...type.caption,
+    color: colors.textMuted,
+    fontWeight: '600',
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 14,
+    marginTop: 'auto',
+  },
   cta: {
     marginTop: spacing.md,
     alignItems: 'center',
