@@ -72,10 +72,10 @@ export default function TabsLayout() {
       tabBar={(props) => <FloatingTabBar {...props} />}
     >
       <MaterialTopTabs.Screen name="index" />
+      <MaterialTopTabs.Screen name="ingredients" />
       <MaterialTopTabs.Screen name="skincare" />
       <MaterialTopTabs.Screen name="haircare" />
       <MaterialTopTabs.Screen name="fragrance" />
-      <MaterialTopTabs.Screen name="ingredients" />
     </MaterialTopTabs>
   );
 }
