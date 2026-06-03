@@ -14,6 +14,7 @@ import { clearActiveTryOnJob, getActiveTryOnJob, pollTryOnJob } from '../lib/ble
 import { saveTryOn } from '../lib/storage';
 import { refreshUser } from '../lib/user';
 import { cancelTryOnReadyNotification } from '../lib/notifications';
+import { checkAchievements } from '../lib/glow';
 
 type State =
   | { kind: 'loading'; partialUri?: string }
@@ -91,6 +92,10 @@ export default function ResultScreen() {
             });
             await clearActiveTryOnJob();
             await cancelTryOnReadyNotification();
+            // Recompute Glow achievements (try-on counters changed). Fire-and-
+            // forget — UI doesn't need to wait, the unlocked set will surface
+            // on the next render of the home tab or achievements screen.
+            checkAchievements().catch(() => {});
             setState({ kind: 'ok', uri: resultUri });
             setView('after');
             return;

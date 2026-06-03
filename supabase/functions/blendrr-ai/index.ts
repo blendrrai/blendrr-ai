@@ -33,15 +33,13 @@ const GEMINI_IMAGE_FALLBACK = 'gemini-2.5-flash-image';
 // (~£0.16 high → ~£0.02 low, ~60s → ~15s).
 const IMAGE_QUALITY: 'low' | 'medium' | 'high' = 'low';
 
-// PREVIOUS: false (full image arrived at end of call, no progressive render).
-// Streaming pushes partial preview frames as the model generates so the user
-// sees something within ~3-4s instead of staring at a spinner.
-const ENABLE_STREAMING = true;
-
-// 0-3. PREVIOUS: 0 (no partials).
-// 2 partials = first preview arrives quickly, second is near-final quality,
-// then the real final replaces both.
-const PARTIAL_IMAGES_COUNT = 2;
+// DISABLED 2026-05-22: OpenAI's /v1/images/edits silently ignored stream=true
+// (returned application/json instead of text/event-stream), so no partial
+// frames ever fired. Code paths are kept intact for future use — when we
+// switch to the Responses API path or move to a model that streams reliably
+// on edits, flip these back to `true` / `2`.
+const ENABLE_STREAMING = false;
+const PARTIAL_IMAGES_COUNT = 0;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
