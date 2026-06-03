@@ -125,11 +125,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   // Absolutely positioned so it sits below the primary CTA without
-  // displacing it. bottom: 110 = 70px below where the primary's bottom
-  // edge sits, leaving a comfortable ~30px gap between the two buttons.
+  // displacing it. bottom: 130 = ~50px below where the primary's bottom
+  // edge sits, leaving a tight ~10px gap between the two buttons.
   secondaryWrap: {
     position: 'absolute',
-    bottom: 110,
+    bottom: 130,
     left: 0,
     right: 0,
     alignItems: 'center',
