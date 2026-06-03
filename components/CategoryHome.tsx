@@ -110,7 +110,11 @@ const styles = StyleSheet.create({
     minHeight: 88,
   },
   cta: {
-    marginTop: spacing.xl,
+    // marginTop: 'auto' + a fixed paddingBottom pins the CTA to the same
+    // Y across every category tab AND the home tab (which uses the same
+    // recipe). When you swipe between tabs the button stays still.
+    marginTop: 'auto',
+    paddingBottom: 120,
     alignItems: 'center',
     gap: spacing.md,
   },

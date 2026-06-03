@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
     maxWidth: 320,
-    marginTop: spacing.xs,
+    marginTop: spacing.md,
     lineHeight: 22,
     zIndex: 3,
     elevation: 3,
@@ -293,10 +293,12 @@ const styles = StyleSheet.create({
     lineHeight: 13,
   },
   cta: {
-    // Pulled up tight to the subtitle so the button sits just below the
-    // title block. zIndex/elevation match the title so it stays on top of
-    // the logo's pink background regardless of platform stacking quirks.
-    marginTop: spacing.xs,
+    // Push to the bottom of the screen with flex:auto so the "Start a try-on"
+    // button lines up with the equivalent button on the Skin / Hair / Scent
+    // / Scan tabs (which use the same trick in CategoryHome). paddingBottom
+    // clears the floating tab bar.
+    marginTop: 'auto',
+    paddingBottom: 120,
     alignItems: 'center',
     zIndex: 3,
     elevation: 3,
