@@ -200,7 +200,17 @@ const styles = StyleSheet.create({
     height: 220,
     marginTop: -spacing.sm,
   },
-  title: { ...type.display, color: colors.text, textAlign: 'center', marginTop: -spacing.sm },
+  // Title overlaps the bottom of the logo PNG — by -32px so it sits visually
+  // "on" the pink area. zIndex/elevation guarantee it paints above the logo
+  // image even on Android where document-order stacking can be unreliable.
+  title: {
+    ...type.display,
+    color: colors.text,
+    textAlign: 'center',
+    marginTop: -spacing.xl,
+    zIndex: 3,
+    elevation: 3,
+  },
   subtitle: {
     ...type.body,
     color: colors.textMuted,
@@ -208,6 +218,8 @@ const styles = StyleSheet.create({
     maxWidth: 320,
     marginTop: spacing.xs,
     lineHeight: 22,
+    zIndex: 3,
+    elevation: 3,
   },
   statsRow: {
     flexDirection: 'row',
@@ -288,7 +300,12 @@ const styles = StyleSheet.create({
     marginTop: 'auto',
   },
   cta: {
-    marginTop: spacing.md,
+    // Pulled up tight to the subtitle so the button sits just below the
+    // title block. zIndex/elevation match the title so it stays on top of
+    // the logo's pink background regardless of platform stacking quirks.
+    marginTop: spacing.xs,
     alignItems: 'center',
+    zIndex: 3,
+    elevation: 3,
   },
 });
