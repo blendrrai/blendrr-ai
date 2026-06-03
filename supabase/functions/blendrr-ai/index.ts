@@ -14,13 +14,12 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const TEXT_MODEL = 'gemini-2.5-flash';
-// Try-on image edits go through OpenAI's gpt-image-2 (newer GA model used by
-// ChatGPT). If unavailable on the account, automatic fallback to gpt-image-1.
-const OPENAI_IMAGE_MODEL = 'gpt-image-2';
-const OPENAI_IMAGE_FALLBACK = 'gpt-image-1';
-// Final-tier fallback if OpenAI itself is unreachable. Gemini Nano Banana 2.5
-// is GA and consistently returns an image (even if quality is lower).
-const GEMINI_IMAGE_FALLBACK = 'gemini-2.5-flash-image';
+// Try-on image edits go through OpenAI's gpt-image-1. We previously had a
+// chain (gpt-image-2 primary → gpt-image-1 → Gemini Nano Banana 2.5) but
+// dropped it on 2026-05-22 — gpt-image-2 isn't broadly available on most
+// accounts and the Gemini fallback drifted from our prompt format. One
+// model, predictable behaviour, easier to debug.
+const OPENAI_IMAGE_MODEL = 'gpt-image-1';
 
 // ============================================================================
 // IMAGE GENERATION CONFIG (2026-05-22)
@@ -637,100 +636,28 @@ async function handleTryOn(payload: {
     shade.hex = shade.hex.startsWith('#') ? shade.hex : `#${shade.hex}`;
   }
 
-  // Step 2: generate try-on image. PRIMARY: OpenAI gpt-image-2 (newer Nano
-  // Banana — the same model ChatGPT uses, dramatically better preservation
-  // and colour fidelity than Gemini). FALLBACK 1: gpt-image-1 (older OpenAI).
-  // FALLBACK 2: Gemini Nano Banana 2.5 (in case OpenAI is unreachable).
+  // Step 2: generate try-on image via OpenAI gpt-image-1. Single model, no
+  // fallbacks — if this call fails, surface the error to the user and let the
+  // server-side credit refund kick in (handled in the async dispatcher).
   const openAIPrompt = mode === 'single' && shade
     ? buildTryOnPrompt(payload.zone, shade.hex, shade.description, shade.finish)
     : buildMultiTryOnPrompt(productImages.length);
-  const geminiPrompt = openAIPrompt;
 
-  let imageBase64: string | null = null;
-  let lastError: string | null = null;
-
-  // Attempt 1: OpenAI gpt-image-2 (primary). Quality routed from user choice:
-  //   ultra → openai 'high' (~£0.13, ~50s, sharpest result)
-  //   medium → openai 'medium' (~£0.05, ~20s, good for browsing)
   const openAIImages = [
     { data: payload.selfieImage, mime: 'image/jpeg' },
     ...productImages.map((data) => ({ data, mime: 'image/jpeg' })),
   ];
-  try {
-    console.log(`[try-on] attempt 1: openai ${OPENAI_IMAGE_MODEL} (${openAIQuality}, mode=${mode}, products=${productImages.length}, stream=${ENABLE_STREAMING})`);
-    imageBase64 = await callOpenAIImageEdit({
-      model: OPENAI_IMAGE_MODEL,
-      prompt: openAIPrompt,
-      quality: openAIQuality,
-      images: openAIImages,
-      stream: ENABLE_STREAMING,
-      partialImages: PARTIAL_IMAGES_COUNT,
-      onPartial,
-    });
-  } catch (e) {
-    lastError = e instanceof Error ? e.message : 'Unknown error';
-    console.log(`[try-on] openai ${OPENAI_IMAGE_MODEL} failed: ${lastError}`);
-  }
 
-  // Attempt 2: OpenAI gpt-image-1 (only if 2 returned a model-not-available error)
-  const modelUnavailable = lastError && (
-    lastError.includes('does not exist') ||
-    lastError.includes('not found') ||
-    lastError.includes('model_not_found') ||
-    lastError.includes('invalid_model') ||
-    lastError.includes('404')
-  );
-  if (!imageBase64 && modelUnavailable) {
-    try {
-      console.log(`[try-on] attempt 2: openai ${OPENAI_IMAGE_FALLBACK} (${openAIQuality}, stream=${ENABLE_STREAMING})`);
-      imageBase64 = await callOpenAIImageEdit({
-        model: OPENAI_IMAGE_FALLBACK,
-        prompt: openAIPrompt,
-        quality: openAIQuality,
-        images: openAIImages,
-        stream: ENABLE_STREAMING,
-        partialImages: PARTIAL_IMAGES_COUNT,
-        onPartial,
-      });
-      lastError = null;
-    } catch (e) {
-      lastError = e instanceof Error ? e.message : 'Unknown error';
-      console.log(`[try-on] openai ${OPENAI_IMAGE_FALLBACK} failed: ${lastError}`);
-    }
-  }
-
-  // Attempt 3: Gemini Nano Banana fallback (only if OpenAI is unreachable / down)
-  if (!imageBase64) {
-    try {
-      console.log(`[try-on] attempt 3: gemini ${GEMINI_IMAGE_FALLBACK} (fallback)`);
-      const parts = await callGemini(GEMINI_IMAGE_FALLBACK, {
-        contents: [{
-          parts: [
-            { text: geminiPrompt },
-            { inlineData: { mimeType: 'image/jpeg', data: payload.selfieImage } },
-            ...productImages.map((data) => ({
-              inlineData: { mimeType: 'image/jpeg', data },
-            })),
-          ],
-        }],
-      });
-      const imagePart = parts.find((p) => p.inlineData);
-      if (imagePart?.inlineData) {
-        imageBase64 = imagePart.inlineData.data;
-        lastError = null;
-      } else {
-        lastError = `Gemini fallback returned no image. Text: ${extractText(parts).slice(0, 200)}`;
-        console.log(`[try-on] ${lastError}`);
-      }
-    } catch (e) {
-      lastError = e instanceof Error ? e.message : 'Unknown error';
-      console.log(`[try-on] gemini fallback failed: ${lastError}`);
-    }
-  }
-
-  if (!imageBase64) {
-    throw new Error(lastError ?? 'No image returned. Try a different selfie or product image.');
-  }
+  console.log(`[try-on] openai ${OPENAI_IMAGE_MODEL} (${openAIQuality}, mode=${mode}, products=${productImages.length}, stream=${ENABLE_STREAMING})`);
+  const imageBase64 = await callOpenAIImageEdit({
+    model: OPENAI_IMAGE_MODEL,
+    prompt: openAIPrompt,
+    quality: openAIQuality,
+    images: openAIImages,
+    stream: ENABLE_STREAMING,
+    partialImages: PARTIAL_IMAGES_COUNT,
+    onPartial,
+  });
 
   return {
     imageBase64,
