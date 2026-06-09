@@ -8,7 +8,7 @@ create table if not exists public.users (
   id text primary key,                       -- anonymous UUID generated client-side, stored in iOS Keychain
   referral_code text unique not null,        -- 6-char short code, e.g. "LUNA42"
   tier text not null default 'free',         -- 'free' | 'pro'
-  credits integer not null default 2,        -- 2 free signup credits — enough for 1 Ultra try-on OR 2 Standard try-ons before paid
+  credits integer not null default 5,        -- 5 free lifetime AI uses (try-ons, quizzes, scans). After that → paywall.
   created_at timestamptz not null default now(),
   pro_started_at timestamptz,                -- when they last became Pro
   pro_credits_renew_at timestamptz,          -- when the 30-credit monthly bucket next refills

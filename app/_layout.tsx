@@ -8,6 +8,7 @@ import { LookProvider } from '../lib/state';
 import { colors } from '../lib/theme';
 import { ensureUserProvisioned, refreshUser } from '../lib/user';
 import { AchievementUnlockModal } from '../components/AchievementUnlockModal';
+import { PaywallModal } from '../components/PaywallModal';
 
 export default function RootLayout() {
   // Provision an anonymous user (server-side) on first mount. Fires once; the
@@ -55,6 +56,9 @@ export default function RootLayout() {
               Subscribes to the unlock broadcast in lib/glow.ts and queues
               celebrations sequentially. */}
           <AchievementUnlockModal />
+          {/* Paywall — fires whenever a free user with 0 credits attempts
+              any AI-credited action (see callEdge in lib/blendrr.ts). */}
+          <PaywallModal />
         </LookProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

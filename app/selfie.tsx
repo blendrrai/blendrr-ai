@@ -10,14 +10,36 @@ import { useLook } from '../lib/state';
 import { presentPickerSheet } from '../lib/pickImage';
 
 export default function SelfieStep() {
-  const { selfieUri, setSelfie } = useLook();
+  const { selfieUri, setSelfie, category, setMode } = useLook();
+  const isClothing = category === 'clothing';
+
+  // Clothing flow is always single-product (one item at a time), so we
+  // skip the /mode step entirely and jump straight to /product. Beauty
+  // flow still routes via /mode for single-vs-multi selection.
+  const onContinue = () => {
+    if (isClothing) {
+      setMode('single');
+      router.push('/product');
+    } else {
+      router.push('/mode');
+    }
+  };
+
+  // The selfie advice also differs — clothing needs a body shot, beauty
+  // needs a front-facing face shot.
+  const subtitle = isClothing
+    ? 'Use a clear body photo showing whatever the item covers — legs for bottoms, arms for short sleeves, etc.'
+    : "Front-facing, soft light, hair pulled back if you're trying lips or face shades.";
+  const emptyHint = isClothing
+    ? 'A full-body or half-body shot works best. Plain backgrounds keep the AI focused.'
+    : 'Take one now or pick a recent shot. Plain backgrounds work best.';
 
   return (
     <Screen>
       <StepHeader
-        step="Step 1 of 4"
-        title="Drop a selfie"
-        subtitle="Front-facing, soft light, hair pulled back if you're trying lips or face shades."
+        step={isClothing ? 'Step 2 of 4' : 'Step 1 of 4'}
+        title={isClothing ? 'Drop a body photo' : 'Drop a selfie'}
+        subtitle={subtitle}
         showHomeButton
       />
 
@@ -26,20 +48,20 @@ export default function SelfieStep() {
           uri={selfieUri}
           onPress={() =>
             presentPickerSheet(setSelfie, {
-              title: 'Add a selfie',
-              cameraLabel: 'Take selfie',
+              title: isClothing ? 'Add a body photo' : 'Add a selfie',
+              cameraLabel: isClothing ? 'Take photo' : 'Take selfie',
               libraryLabel: 'Pick from library',
             })
           }
-          emptyTitle="Add your selfie"
-          emptyHint="Take one now or pick a recent shot. Plain backgrounds work best."
+          emptyTitle={isClothing ? 'Add your body photo' : 'Add your selfie'}
+          emptyHint={emptyHint}
         />
       </View>
 
       <View style={styles.cta}>
         <Button
           label="Continue"
-          onPress={() => router.push('/mode')}
+          onPress={onContinue}
           disabled={!selfieUri}
           trailing={<ArrowRight size={20} color={colors.primaryOn} strokeWidth={2.4} />}
         />

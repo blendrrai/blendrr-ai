@@ -26,37 +26,20 @@ import {
 } from '../../lib/user';
 import { LEGAL_URLS } from '../../lib/legal';
 
-const PRO_CREDITS_PER_MONTH = 30;
-
 const PRO_PRICES: Record<Currency, string> = {
   GBP: '£9.99',
   USD: '$12.99',
   EUR: '€12.99',
 };
 
-const PACKS: Record<Currency, { credits: number; price: string; badge?: string }[]> = {
-  GBP: [
-    { credits: 10, price: '£6.99' },
-    { credits: 30, price: '£12.99', badge: 'Best value' },
-    { credits: 100, price: '£32.99' },
-  ],
-  USD: [
-    { credits: 10, price: '$8.99' },
-    { credits: 30, price: '$15.99', badge: 'Best value' },
-    { credits: 100, price: '$39.99' },
-  ],
-  EUR: [
-    { credits: 10, price: '€7.99' },
-    { credits: 30, price: '€14.99', badge: 'Best value' },
-    { credits: 100, price: '€36.99' },
-  ],
-};
+const FREE_INITIAL_USES = 5;
 
 const PRO_FEATURES = [
-  `${PRO_CREDITS_PER_MONTH} credits every month`,
-  'Shared across try-ons and analyses',
-  'Priority AI processing',
-  'Early access to new tools',
+  'Unlimited try-ons in Ultra HD',
+  'All routine quizzes (skin, hair, acne, fragrance)',
+  'Unlimited ingredient scans',
+  'Glow Score, streak & wishlist — always free',
+  'All future features included',
 ];
 
 export default function Credits() {
@@ -117,42 +100,23 @@ export default function Credits() {
 
   const currency = sub.currency ?? 'GBP';
   const proPrice = PRO_PRICES[currency];
-  const packs = PACKS[currency];
 
   const upgrade = () => {
     Alert.alert(
-      `Upgrade to Pro — ${proPrice}/month`,
-      `${PRO_CREDITS_PER_MONTH} credits a month, shared across try-ons and analyses. Billing wires up next.`,
+      `BLENDRR Pro — ${proPrice}/month`,
+      'Unlimited try-ons, quizzes, and ingredient scans. Auto-renews monthly. Cancel anytime. Billing flow wires up next via RevenueCat.',
       [
         { text: 'Not now', style: 'cancel' },
         {
           text: 'Simulate Pro',
           onPress: async () => {
-            const next: Subscription = {
-              ...sub,
-              tier: 'pro',
-              credits: Math.max(sub.credits, PRO_CREDITS_PER_MONTH),
-            };
+            const next: Subscription = { ...sub, tier: 'pro' };
             await saveSubscription(next);
             setSub(next);
           },
         },
       ],
     );
-  };
-
-  const buyCredits = (pack: (typeof packs)[number]) => {
-    Alert.alert(`Buy ${pack.credits} credits`, `${pack.price} — App Store sheet wires up next.`, [
-      { text: 'Not now', style: 'cancel' },
-      {
-        text: 'Simulate purchase',
-        onPress: async () => {
-          const next: Subscription = { ...sub, credits: sub.credits + pack.credits };
-          await saveSubscription(next);
-          setSub(next);
-        },
-      },
-    ]);
   };
 
   const [restoring, setRestoring] = useState(false);
@@ -191,7 +155,7 @@ export default function Credits() {
 
   return (
     <Screen>
-      <StepHeader title="Credits" subtitle="Your plan, credit balance, and packs." />
+      <StepHeader title="Plan" subtitle="Your free uses and BLENDRR Pro." />
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -276,26 +240,22 @@ export default function Credits() {
           )}
         </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionLabel}>Credits</Text>
-            <View style={styles.creditPill}>
-              <Coins size={14} color={colors.text} strokeWidth={2} />
-              <Text style={styles.creditCount}>{sub.credits}</Text>
+        {!isPro && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionLabel}>Free uses left</Text>
+              <View style={styles.creditPill}>
+                <Coins size={14} color={colors.text} strokeWidth={2} />
+                <Text style={styles.creditCount}>{sub.credits} / {FREE_INITIAL_USES}</Text>
+              </View>
             </View>
+            <Text style={styles.sectionHelper}>
+              New users get {FREE_INITIAL_USES} free AI uses — spend them on any combination of
+              try-ons, quizzes, or ingredient scans. After that, BLENDRR Pro unlocks unlimited
+              everything. Glow Score, daily streak, achievements and wishlist stay free forever.
+            </Text>
           </View>
-          <Text style={styles.sectionHelper}>
-            Most AI features (quizzes, ingredient scans, single-product try-ons) cost 1 credit.
-            Full-face multi-product try-ons cost 2 credits. Every try-on is rendered at our
-            highest quality. Pro members get {PRO_CREDITS_PER_MONTH} credits a month.
-          </Text>
-        </View>
-
-        <View style={styles.packGrid}>
-          {packs.map((pack) => (
-            <CreditPack key={pack.credits} pack={pack} onBuy={() => buyCredits(pack)} />
-          ))}
-        </View>
+        )}
 
         <View style={[styles.referralCard, shadow.card]}>
           <View style={styles.referralHeader}>
@@ -383,7 +343,7 @@ export default function Credits() {
           </Text>
 
           <Text style={styles.disclosureFootnote}>
-            Credit packs are one-off purchases — no recurring charges. Unused credits do not expire.
+            No yearly plan and no one-off packs — just one straightforward monthly subscription.
           </Text>
 
           <View style={styles.disclosureLegalRow}>
@@ -444,39 +404,6 @@ function Cta({ label, onPress }: { label: string; onPress: () => void }) {
       style={[styles.cta, animStyle]}
     >
       <Text style={styles.ctaLabel}>{label}</Text>
-    </AnimatedPressable>
-  );
-}
-
-function CreditPack({
-  pack,
-  onBuy,
-}: {
-  pack: { credits: number; price: string; badge?: string };
-  onBuy: () => void;
-}) {
-  const scale = useSharedValue(1);
-  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-  return (
-    <AnimatedPressable
-      onPress={onBuy}
-      onPressIn={() => {
-        scale.value = withSpring(0.97, { damping: 18, stiffness: 260 });
-      }}
-      onPressOut={() => {
-        scale.value = withSpring(1, { damping: 14, stiffness: 220 });
-      }}
-      style={[styles.pack, shadow.card, animStyle]}
-    >
-      {pack.badge && (
-        <View style={styles.packBadge}>
-          <Text style={styles.packBadgeText}>{pack.badge}</Text>
-        </View>
-      )}
-      <Text style={styles.packCredits}>{pack.credits}</Text>
-      <Text style={styles.packCreditsLabel}>credits</Text>
-      <Text style={styles.packPrice}>{pack.price}</Text>
     </AnimatedPressable>
   );
 }

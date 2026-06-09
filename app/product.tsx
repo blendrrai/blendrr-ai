@@ -23,7 +23,18 @@ import { canUseCredit } from '../lib/storage';
 import { scheduleTryOnReadyNotification } from '../lib/notifications';
 
 export default function ProductStep() {
-  const { selfieUri, mode, zone, quality, productUris, addProduct, removeProduct, replaceProduct } = useLook();
+  const {
+    selfieUri,
+    mode,
+    zone,
+    quality,
+    category,
+    clothingZone,
+    productUris,
+    addProduct,
+    removeProduct,
+    replaceProduct,
+  } = useLook();
   const [submitting, setSubmitting] = useState(false);
 
   const isSingle = mode === 'single';
@@ -60,7 +71,15 @@ export default function ProductStep() {
       return;
     }
     try {
-      await startTryOn({ selfieUri, productUris, zone, mode, quality });
+      await startTryOn({
+        selfieUri,
+        productUris,
+        zone,
+        mode,
+        quality,
+        category,
+        clothingZone: category === 'clothing' ? clothingZone : undefined,
+      });
       // Schedule a local notification timed for when the try-on should
       // finish. Fire-and-forget — if permission isn't granted, it no-ops.
       void scheduleTryOnReadyNotification(mode, quality);

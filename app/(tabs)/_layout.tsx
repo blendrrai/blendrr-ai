@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { Redirect, withLayoutContext } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Droplet, Flower2, ScanLine, Wand2, Wind } from 'lucide-react-native';
+import { Droplet, Flower2, ScanLine, Shirt, Wand2, Wind } from 'lucide-react-native';
 import ReAnimated, {
   useAnimatedStyle,
   useSharedValue,
@@ -32,6 +32,7 @@ type IconProps = { size: number; color: string; strokeWidth: number };
 
 const TAB_ICONS: Record<string, ComponentType<IconProps>> = {
   index: Wand2,
+  clothing: Shirt,
   skincare: Droplet,
   haircare: Wind,
   fragrance: Flower2,
@@ -40,6 +41,7 @@ const TAB_ICONS: Record<string, ComponentType<IconProps>> = {
 
 const TAB_LABELS: Record<string, string> = {
   index: 'Try-on',
+  clothing: 'Fit',
   skincare: 'Skin',
   haircare: 'Hair',
   fragrance: 'Scent',
@@ -72,6 +74,7 @@ export default function TabsLayout() {
       tabBar={(props) => <FloatingTabBar {...props} />}
     >
       <MaterialTopTabs.Screen name="index" />
+      <MaterialTopTabs.Screen name="clothing" />
       <MaterialTopTabs.Screen name="ingredients" />
       <MaterialTopTabs.Screen name="skincare" />
       <MaterialTopTabs.Screen name="haircare" />

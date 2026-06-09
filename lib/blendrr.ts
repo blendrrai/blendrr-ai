@@ -3,7 +3,8 @@ import { File, Paths } from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { ensureUserId, ensureUserProvisioned, getCachedUser, updateCachedUser } from './user';
-import type { Zone } from './theme';
+import { showPaywall } from './paywall';
+import type { Category, ClothingZone, Zone } from './theme';
 import type { Answers } from '../components/Questionnaire';
 
 // ============================================================================
@@ -78,7 +79,11 @@ async function callEdge<T>(task: string, payload: unknown): Promise<T> {
 
   if (message) {
     if (message === 'Out of credits') {
-      throw new Error("You're out of credits. Top up or upgrade to Pro to keep going.");
+      // Float the global paywall modal over whichever screen triggered this,
+      // then still throw so the calling screen exits its loading state. The
+      // user sees the paywall sheet — no need for a separate Alert.
+      showPaywall();
+      throw new Error("You're out of free uses. Upgrade to BLENDRR Pro to keep going.");
     }
     if (message === 'User not found') {
       // Still missing after a fresh provision — something's seriously off.
@@ -146,6 +151,10 @@ export type TryOnInput = {
   /** 'single' = one product, one zone. 'multi' = full-face, up to 5 products, AI figures out where each goes. */
   mode: 'single' | 'multi';
   quality?: 'medium' | 'ultra';
+  /** Which prompt family to use server-side. Defaults to 'beauty' for back-compat. */
+  category?: Category;
+  /** Required when category === 'clothing'. Picks the body region for the prompt. */
+  clothingZone?: ClothingZone;
 };
 
 type ShadeInfo = {
@@ -179,6 +188,8 @@ export async function startTryOn({
   zone,
   mode,
   quality = 'medium',
+  category = 'beauty',
+  clothingZone,
 }: TryOnInput): Promise<ActiveTryOnJob> {
   if (productUris.length === 0) throw new Error('Add at least one product.');
 
@@ -194,7 +205,10 @@ export async function startTryOn({
     zone: Zone;
     mode: 'single' | 'multi';
     quality: 'medium' | 'ultra';
-  } = { selfieImage, zone, mode, quality };
+    category: Category;
+    clothingZone?: ClothingZone;
+  } = { selfieImage, zone, mode, quality, category };
+  if (clothingZone) payload.clothingZone = clothingZone;
   if (mode === 'single') {
     payload.productImage = productImages[0];
   } else {

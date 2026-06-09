@@ -624,6 +624,74 @@ OUTPUT STYLE:
 Ultra realistic beauty campaign / iPhone selfie realism. No glam filters, no AI artifacts, no doll-like skin, no plastic textures. The result should look like a real photo of a real person wearing real makeup that they've applied themselves.`;
 }
 
+type ClothingZone = 'top' | 'bottom' | 'dress' | 'shoes' | 'jewelry' | 'accessory';
+
+/**
+ * Per-zone instruction for the clothing AI. Each entry tells the model
+ * (a) what body region to edit, and (b) which surrounding parts of the
+ * subject MUST stay untouched. Build, body shape, face, and skin tone are
+ * locked across every variant — that's the user's hard requirement.
+ */
+const CLOTHING_ZONE_PROMPTS: Record<ClothingZone, { editArea: string; preserveExtras: string }> = {
+  top: {
+    editArea: 'the upper-body clothing the person is wearing (shirt, top, jacket, blouse, hoodie). Replace it with the item from Image 2.',
+    preserveExtras: 'Keep the person\'s arms, hands, neck, shoulders, and chest shape exactly as in the input. If the new item has shorter sleeves than what they were wearing, reveal the arms naturally as they exist in the input — do NOT redraw or reshape the arms.',
+  },
+  bottom: {
+    editArea: 'the lower-body clothing the person is wearing (trousers, jeans, shorts, skirt). Replace it with the item from Image 2.',
+    preserveExtras: 'Keep the person\'s legs, feet, hips, and waist exactly as in the input. If the new item is shorter than what they were wearing (e.g. shorts replacing pants), reveal the legs naturally — do NOT slim, shape, or redraw the legs.',
+  },
+  dress: {
+    editArea: 'the entire outfit the person is wearing — both upper and lower body. Replace it with the dress or jumpsuit from Image 2.',
+    preserveExtras: 'Keep the person\'s arms, legs, neck, hands, and feet exactly as in the input. Match the new garment to the person\'s real body proportions — do NOT slim, lengthen, or otherwise reshape the body.',
+  },
+  shoes: {
+    editArea: 'the shoes the person is wearing. Replace them with the shoes from Image 2.',
+    preserveExtras: 'Keep the person\'s feet, ankles, legs, and the rest of the outfit exactly as in the input. The shoes should sit naturally on the floor / ground as they do in the original.',
+  },
+  jewelry: {
+    editArea: 'add the jewelry item from Image 2 to the appropriate body part — necklace on the chest/collarbone, earrings on the ears, bracelet on the wrist, ring on a finger.',
+    preserveExtras: 'Do NOT remove any existing jewelry unless it conflicts with the new piece (e.g. swapping one necklace for another). Keep the person\'s neck, ears, hands, and skin tone exactly as in the input.',
+  },
+  accessory: {
+    editArea: 'add the accessory from Image 2 to the appropriate part of the person — a bag in the hand or over the shoulder, a hat on the head, a scarf around the neck, sunglasses on the face.',
+    preserveExtras: 'Place the accessory naturally where it would sit in real life. Keep the person\'s hair, face, hands, and body exactly as in the input.',
+  },
+};
+
+function buildClothingTryOnPrompt(zone: ClothingZone): string {
+  const z = CLOTHING_ZONE_PROMPTS[zone];
+  return `You are a professional fashion AI image editor.
+
+TASK:
+${z.editArea} Drape, fit, and texture the new item realistically on the person — natural folds, correct fabric behaviour, matching lighting and shadows.
+
+INPUTS:
+- Image 1: a photo of the person (this is the canvas you will edit).
+- Image 2: the clothing or accessory product. Use the actual garment / item, NOT any model who may be wearing it in the reference.
+
+INSTRUCTIONS:
+- Match the product's colour, pattern, texture, material, and silhouette from Image 2 as closely as possible.
+- The new item should fit the person's real body — natural drape, no stiff "pasted-on" look.
+- Respect the person's pose, the lighting direction in Image 1, and the shadows on their body.
+
+BODY PRESERVATION — DO NOT CHANGE (this is critical):
+- The person's body shape, build, height, weight, and proportions MUST be IDENTICAL to the input. Do NOT slim, thicken, lengthen, shorten, tone, or otherwise reshape the body in ANY way.
+- The person's face, hair, expression, and skin MUST be IDENTICAL to the input.
+- The person's skin tone, undertone, and any visible markings (freckles, moles, tattoos) MUST be IDENTICAL to the input.
+- ${z.preserveExtras}
+- The background, framing, crop, aspect ratio, and lighting MUST be IDENTICAL to the input.
+
+DO NOT:
+- Beautify or "improve" the person in any way.
+- Smooth or blur skin texture.
+- Generate any body part that wasn't visible in the input. If the original photo cuts off at the waist, the output must also cut off at the waist.
+- Add filters, glow, makeup, or any artistic stylisation.
+
+OUTPUT STYLE:
+Photorealistic. The result should look like an unedited real photo of the real person wearing the new item — same body, same face, same background, same lighting. Only the specified clothing region has changed.`;
+}
+
 async function handleTryOn(payload: {
   selfieImage: string;
   productImage?: string;
@@ -631,11 +699,15 @@ async function handleTryOn(payload: {
   zone: Zone;
   mode?: 'single' | 'multi';
   quality?: 'medium' | 'ultra';
+  category?: 'beauty' | 'clothing';
+  clothingZone?: ClothingZone;
 }, onPartial?: (b64: string) => void | Promise<void>) {
-  const mode: 'single' | 'multi' = payload.mode === 'multi' ? 'multi' : 'single';
+  const category: 'beauty' | 'clothing' = payload.category === 'clothing' ? 'clothing' : 'beauty';
+  // Clothing flow is always single-product (no multi-mode), so coerce here.
+  const mode: 'single' | 'multi' = category === 'clothing'
+    ? 'single'
+    : (payload.mode === 'multi' ? 'multi' : 'single');
   const quality: 'medium' | 'ultra' = payload.quality === 'ultra' ? 'ultra' : 'medium';
-  // PREVIOUS: const openAIQuality: 'medium' | 'high' = quality === 'ultra' ? 'high' : 'medium';
-  // Both tiers now collapse to IMAGE_QUALITY (currently 'low') — see config block above.
   const openAIQuality = IMAGE_QUALITY;
 
   // Collect product images. Single mode = 1; multi mode = N (up to 5).
@@ -650,10 +722,11 @@ async function handleTryOn(payload: {
     throw new Error('Multi mode supports up to 5 products.');
   }
 
-  // Step 1: describe shade (single mode only — skipped for multi since each
-  // product has its own shade and the AI will read each visually).
+  // Step 1 (BEAUTY only): describe shade. Clothing skips this entirely since
+  // we want the AI to read the garment colour, pattern, and texture directly
+  // from the reference image — no hex extraction makes sense for clothing.
   let shade: { hex: string; description: string; finish: string } | null = null;
-  if (mode === 'single') {
+  if (category === 'beauty' && mode === 'single') {
     try {
       shade = await handleDescribeShade({ productImage: productImages[0], zone: payload.zone });
     } catch {
@@ -665,12 +738,19 @@ async function handleTryOn(payload: {
     shade.hex = shade.hex.startsWith('#') ? shade.hex : `#${shade.hex}`;
   }
 
-  // Step 2: generate try-on image via OpenAI gpt-image-1. Single model, no
-  // fallbacks — if this call fails, surface the error to the user and let the
-  // server-side credit refund kick in (handled in the async dispatcher).
-  const openAIPrompt = mode === 'single' && shade
-    ? buildTryOnPrompt(payload.zone, shade.hex, shade.description, shade.finish)
-    : buildMultiTryOnPrompt(productImages.length);
+  // Step 2: generate try-on image via OpenAI gpt-image-1. Prompt family
+  // picked based on category — beauty uses the shade-based makeup prompts,
+  // clothing uses a body-preservation-first garment prompt keyed to the
+  // selected clothing region.
+  let openAIPrompt: string;
+  if (category === 'clothing') {
+    const cz: ClothingZone = payload.clothingZone ?? 'top';
+    openAIPrompt = buildClothingTryOnPrompt(cz);
+  } else if (mode === 'single' && shade) {
+    openAIPrompt = buildTryOnPrompt(payload.zone, shade.hex, shade.description, shade.finish);
+  } else {
+    openAIPrompt = buildMultiTryOnPrompt(productImages.length);
+  }
 
   const openAIImages = [
     { data: payload.selfieImage, mime: 'image/jpeg' },
@@ -1007,14 +1087,14 @@ serve(async (req) => {
 
     if (userError || !user) return json({ error: 'User not found' }, 401);
 
-    // Credit cost — Ultra HD is now the only quality tier (no choice screen),
-    // so the previous "+1 if ultra" modifier is gone. Try-on is 1 credit for
-    // a single product, 2 for a full-face multi-product look. All other
-    // credited tasks (quizzes, scans) are 1 credit flat.
-    let creditCost = 1;
-    if (task === 'try-on' && payload?.mode === 'multi') creditCost += 1;
+    // Credit cost — flat 1 credit per AI action for free users. New users
+    // get 5 free uses (see schema default). Pro users bypass the credit
+    // system entirely — they're billed monthly by Apple and have unlimited
+    // access for the duration of their subscription.
+    const isPro = user.tier === 'pro';
+    const creditCost = isPro ? 0 : 1;
 
-    if (user.credits < creditCost) {
+    if (!isPro && user.credits < creditCost) {
       return json({ error: 'Out of credits', credits: user.credits, required: creditCost }, 402);
     }
 

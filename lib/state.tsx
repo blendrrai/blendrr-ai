@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
-import type { Mode, Quality, Zone } from './theme';
+import type { Category, ClothingZone, Mode, Quality, Zone } from './theme';
 import type { Answers } from '../components/Questionnaire';
 import {
   saveRoutineAnswers as persistAnswers,
@@ -16,6 +16,12 @@ type LookState = {
   zone: Zone;
   mode: Mode;
   quality: Quality;
+  /** Which flow the user is in. Drives prompt selection on the server side. */
+  category: Category;
+  /** Selected clothing region — only meaningful when category === 'clothing'. */
+  clothingZone: ClothingZone;
+  setCategory: (category: Category) => void;
+  setClothingZone: (zone: ClothingZone) => void;
   setSelfie: (uri: string | null) => void;
   /** Add a product to the list. Replaces if single mode. */
   addProduct: (uri: string, sourceUrl?: string | null) => void;
@@ -68,6 +74,8 @@ export function LookProvider({ children }: { children: ReactNode }) {
   // Always 'ultra' — quality picker screen was removed. setQuality stays
   // exposed for compatibility but isn't invoked from any current flow.
   const [quality, setQuality] = useState<Quality>('ultra');
+  const [category, setCategory] = useState<Category>('beauty');
+  const [clothingZone, setClothingZone] = useState<ClothingZone>('top');
 
   const [routineAnswers, setAllAnswers] = useState<Record<RoutineCategory, Answers>>(emptyAnswers);
   const [routinePhotos, setAllPhotos] = useState<Record<RoutineCategory, string | null>>(emptyPhotos);
@@ -147,6 +155,10 @@ export function LookProvider({ children }: { children: ReactNode }) {
         zone,
         mode,
         quality,
+        category,
+        clothingZone,
+        setCategory,
+        setClothingZone,
         setSelfie,
         addProduct,
         removeProduct,

@@ -121,3 +121,20 @@ export const modeCost: Record<Mode, number> = {
 };
 
 export const MAX_PRODUCTS_MULTI = 5;
+
+// Clothing try-on — separate from the makeup `Zone` since it maps to body
+// regions, not facial features. Each value also tells the AI prompt which
+// part of the user's body to edit and (critically) which parts to leave
+// untouched.
+export type ClothingZone = 'top' | 'bottom' | 'dress' | 'shoes' | 'jewelry' | 'accessory';
+
+export const clothingZoneLabels: Record<ClothingZone, string> = {
+  top: 'Top half',
+  bottom: 'Bottom half',
+  dress: 'Full outfit',
+  shoes: 'Shoes',
+  jewelry: 'Jewelry',
+  accessory: 'Accessory',
+};
+
+export type Category = 'beauty' | 'clothing';
