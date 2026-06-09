@@ -27,11 +27,11 @@ type State =
  * Sequenced loosely from "first step" to "final touches" so the user feels
  * concrete progress, even though there's no real progress signal.
  *
- * 18 messages × 2.5s = ~45s per full cycle, which roughly matches the Ultra
- * HD generation time — most users see each message once and never feel
- * stuck on the same text.
+ * Two sets, picked by category. 18 messages × 2.5s = ~45s per cycle, which
+ * roughly matches Ultra HD generation time — most users see each message
+ * once and never feel stuck on the same text.
  */
-const LOADING_LABELS = [
+const BEAUTY_LOADING_LABELS = [
   'Reading the shade…',
   'Sampling the colour…',
   'Mapping your features…',
@@ -52,8 +52,29 @@ const LOADING_LABELS = [
   'Adding that final glow ✨',
 ] as const;
 
+const CLOTHING_LOADING_LABELS = [
+  'Studying the fit…',
+  'Reading the fabric…',
+  'Mapping your body shape…',
+  'Picking up the pattern…',
+  'Locking in your silhouette…',
+  'Matching the colour & texture…',
+  'Aligning to your pose…',
+  'Draping it onto you…',
+  'Catching the natural folds…',
+  'Tailoring to your frame…',
+  'Smoothing the seams…',
+  'Refining the cut…',
+  'Adjusting the drape…',
+  'Locking the lighting in…',
+  'Almost ready for the fit check…',
+  'Bringing the look to life…',
+  'Final touches on the silhouette…',
+  'Setting up your fit check ✨',
+] as const;
+
 export default function ResultScreen() {
-  const { selfieUri, productUris, productUrls, zone, mode, quality, resetTryOn } = useLook();
+  const { selfieUri, productUris, productUrls, zone, mode, quality, category, resetTryOn } = useLook();
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [saving, setSaving] = useState(false);
   const [enlargedUri, setEnlargedUri] = useState<string | null>(null);
@@ -206,7 +227,9 @@ export default function ResultScreen() {
     try {
       await Share.share({
         url: state.uri,
-        message: 'Look what I just tried on with BLENDRR Ai 💄',
+        message: category === 'clothing'
+          ? 'Just did a fit check on BLENDRR Ai 👗'
+          : 'Look what I just tried on with BLENDRR Ai 💄',
       });
     } catch {
       // user cancelled
@@ -246,7 +269,7 @@ export default function ResultScreen() {
     <Screen>
       <StepHeader
         step="Result"
-        title="Your shade match"
+        title={category === 'clothing' ? 'Your fit check' : 'Your shade match'}
         onBack={backHome}
       />
 
@@ -257,7 +280,7 @@ export default function ResultScreen() {
       >
         {state.kind === 'loading' && !state.partialUri && (
           <AiLoading
-            labels={LOADING_LABELS}
+            labels={category === 'clothing' ? CLOTHING_LOADING_LABELS : BEAUTY_LOADING_LABELS}
             hint={loadingHint}
           />
         )}
