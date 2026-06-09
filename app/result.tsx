@@ -242,18 +242,35 @@ export default function ResultScreen() {
   };
 
   const confirmLeave = (action: () => void) => {
-    if (state.kind !== 'ok' || savedToRoll || addedToWishlist) {
-      action();
+    // Mid-generation — credit is already deducted server-side and the AI is
+    // working. Leaving abandons the result and the credit won't be refunded
+    // (the job still completes, but the user loses visibility of it).
+    if (state.kind === 'loading') {
+      const noun = category === 'clothing' ? 'fit check' : 'try-on';
+      Alert.alert(
+        'Heads up',
+        `Your ${noun} is still generating. Leave now and you'll lose this result — your credit won't be refunded.`,
+        [
+          { text: 'Stay here', style: 'cancel' },
+          { text: 'Leave anyway', style: 'destructive', onPress: action },
+        ],
+      );
       return;
     }
-    Alert.alert(
-      'Heads up',
-      "You haven't saved this try-on to camera roll or added the product to your wishlist. Leave anyway?",
-      [
-        { text: 'Stay here', style: 'cancel' },
-        { text: 'Leave anyway', style: 'destructive', onPress: action },
-      ],
-    );
+    // Result is ready but the user hasn't saved it anywhere.
+    if (state.kind === 'ok' && !savedToRoll && !addedToWishlist) {
+      Alert.alert(
+        'Heads up',
+        "You haven't saved this to your camera roll or added the product to your wishlist. Leave anyway?",
+        [
+          { text: 'Stay here', style: 'cancel' },
+          { text: 'Leave anyway', style: 'destructive', onPress: action },
+        ],
+      );
+      return;
+    }
+    // Error / no-credits / already-saved states — no need to warn.
+    action();
   };
 
   const startOver = () => confirmLeave(goHome);
