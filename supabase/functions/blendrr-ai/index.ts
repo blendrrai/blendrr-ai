@@ -332,9 +332,30 @@ function buildTryOnPrompt(
   const header = `You are a professional beauty AI image editor.`;
   const outputStyle = `OUTPUT STYLE:\nUltra realistic beauty campaign / iPhone selfie realism. No glam filters, no AI artifacts, no doll-like skin, no plastic textures. The result should look like a real photo of a real person wearing real makeup.`;
 
+  // Reinforced skin-tone preservation. gpt-image leans toward an "idealised"
+  // look by default — slightly tanned, slightly evened — which produced
+  // noticeable skin-colour drift between consecutive try-ons. Repeats the
+  // constraint three ways (must-be-identical / do-not-tan / do-not-lighten)
+  // because repetition + capitals is what reliably overrides the default
+  // beautify behaviour.
+  const skinToneLock = `SKIN TONE — DO NOT CHANGE:
+- The subject's skin tone in the output MUST be IDENTICAL to the input. Sample the forehead, cheek, jawline, and neck — these read at the SAME hue, brightness, and saturation as the original photo.
+- Do NOT tan, bronze, deepen, warm, or darken the skin anywhere on the face, neck, ears, or shoulders.
+- Do NOT lighten, brighten, fair-up, cool down, or wash out the skin anywhere on the face, neck, ears, or shoulders.
+- Do NOT shift the undertone (warm / cool / neutral / olive) by even one step.
+- The makeup zone you are editing is the ONLY region whose colour may change. All other skin pixels stay bit-for-bit the same as the input.
+- Imagine the before/after side by side — outside the makeup zone a viewer must NOT be able to perceive any skin-colour difference.`;
+
   // Common preservation block — appears in every prompt with minor tweaks.
-  const preserveCommon = `- Preserve the person's exact identity, facial structure, skin tone, skin texture, freckles, moles, hairstyle, lighting, shadows, and camera characteristics.
-- Do NOT beautify the person, smooth the skin, alter facial proportions, or change skin tone.
+  // skinToneLock is prepended so every zone's preservation list leads with
+  // the skin-tone constraint. Earlier prompt tokens carry more weight in
+  // gpt-image's output, so putting it at the top of the preservation block
+  // makes it harder for the model to drift on subsequent lines.
+  const preserveCommon = `${skinToneLock}
+
+OTHER PRESERVATION:
+- Preserve the person's exact identity, facial structure, skin texture, freckles, moles, hairstyle, lighting, shadows, and camera characteristics.
+- Do NOT beautify the person, smooth the skin, alter facial proportions, or remove blemishes.
 - Preserve the original pose, expression, background, framing, crop, aspect ratio, and exact face position within the frame. A user comparing before and after should see the face stay still — only the target region changes.
 - Avoid over-smoothing, AI artifacts, glam filters, or unrealistic skin.`;
 
@@ -589,7 +610,14 @@ INSTRUCTIONS:
   • Hair colour → hair strands only
 - Match each product's exact colour from its image. Read the colour from the actual product (lipstick bullet, swatch, cream, powder) — NOT the cap, tube, label, or packaging.
 - Apply each product realistically and proportionately. The full look should feel cohesive and wearable, like real makeup done by a professional — not a stage look.
-- Preserve the person's identity, facial structure, skin texture, freckles, moles, hairstyle (unless hair colour was a product), lighting, shadows, and background. Do NOT beautify, smooth, alter proportions, or change skin tone (foundation aside).
+
+SKIN TONE — DO NOT CHANGE:
+- The subject's overall skin tone MUST be IDENTICAL to the input. Sample the forehead, jawline, and neck — these read at the SAME hue, brightness, and saturation as the original.
+- Do NOT tan, bronze, deepen, warm, or darken the skin anywhere on the face, neck, ears, or shoulders. Do NOT lighten, brighten, fair-up, cool down, or wash out the skin anywhere.
+- Do NOT shift the undertone (warm / cool / neutral / olive).
+- If foundation is one of the products, apply it as a thin, natural-looking layer that matches the EXISTING skin tone — foundation must not be used as an excuse to lift or tan the overall face. The neck must continue to match the face.
+
+- Preserve the person's identity, facial structure, skin texture, freckles, moles, hairstyle (unless hair colour was a product), lighting, shadows, and background. Do NOT beautify, smooth, alter proportions, or remove blemishes.
 - Preserve the original pose, expression, framing, crop, aspect ratio, and exact face position. A user comparing before and after should see the face stay still — only the applied makeup should differ.
 - Avoid AI artifacts, glam filters, doll-like skin, painted-on edges, or anything that looks unnatural.
 
