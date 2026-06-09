@@ -17,11 +17,13 @@ import { Screen } from '../components/Screen';
 import { StepHeader } from '../components/StepHeader';
 import { Button } from '../components/Button';
 import { EnlargeButton, ImageEnlargerModal } from '../components/ImageEnlarger';
-import { colors, radius, shadow, spacing, type, zoneLabels } from '../lib/theme';
+import { colors, radius, shadow, spacing, type } from '../lib/theme';
 import {
   deleteTryOn,
   getTryOnById,
   saveWishlistItem,
+  tryOnSectionLabel,
+  tryOnTitleLabel,
   updateTryOn,
   type TryOn,
   type WishlistItem,
@@ -122,8 +124,10 @@ export default function TryOnDetail() {
   const reuseShade = () => {
     if (!tryOn) return;
     Alert.alert(
-      `${zoneLabels[tryOn.zone]} try-on`,
-      'Reuse this shade on a new selfie?',
+      tryOnTitleLabel(tryOn),
+      tryOn.category === 'clothing'
+        ? 'Reuse this item on a new photo?'
+        : 'Reuse this shade on a new selfie?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -189,7 +193,7 @@ export default function TryOnDetail() {
   return (
     <Screen>
       <StepHeader
-        title={zoneLabels[tryOn.zone]}
+        title={tryOnSectionLabel(tryOn)}
         subtitle={formatDate(tryOn.createdAt)}
       />
 

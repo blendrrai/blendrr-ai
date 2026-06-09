@@ -74,7 +74,7 @@ const CLOTHING_LOADING_LABELS = [
 ] as const;
 
 export default function ResultScreen() {
-  const { selfieUri, productUris, productUrls, zone, mode, quality, category, resetTryOn } = useLook();
+  const { selfieUri, productUris, productUrls, zone, mode, quality, category, clothingZone, resetTryOn } = useLook();
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [saving, setSaving] = useState(false);
   const [enlargedUri, setEnlargedUri] = useState<string | null>(null);
@@ -138,6 +138,8 @@ export default function ResultScreen() {
               productUrls,
               mode,
               quality,
+              category,
+              clothingZone: category === 'clothing' ? clothingZone : undefined,
               resultUri,
             });
             await clearActiveTryOnJob();
@@ -158,7 +160,7 @@ export default function ResultScreen() {
         console.warn('[try-on] poll error, retrying in 4s:', message);
       }
     },
-    [zone, mode, quality, selfieUri, productUris, productUrls],
+    [zone, mode, quality, category, clothingZone, selfieUri, productUris, productUrls],
   );
 
   /** Resume / start polling for the currently active job. */

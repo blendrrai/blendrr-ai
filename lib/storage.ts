@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { Zone } from './theme';
+import { clothingZoneLabels, zoneLabels, type ClothingZone, type Zone } from './theme';
 import type { Answers } from '../components/Questionnaire';
 import {
   ensureUserProvisioned,
@@ -38,8 +38,33 @@ export type TryOn = {
   mode?: 'single' | 'multi';
   /** Quality tier used. Missing on old records. */
   quality?: 'medium' | 'ultra';
+  /** Which flow this try-on came from. Defaults to 'beauty' for old records. */
+  category?: 'beauty' | 'clothing';
+  /** Set only when category === 'clothing'. */
+  clothingZone?: ClothingZone;
   resultUri: string | null;
 };
+
+/**
+ * Short label describing what the try-on covers. Used for history rows,
+ * detail-screen headers, share copy. Picks the right label per category:
+ *   - clothing → "Top half", "Shoes", "Jewelry", etc.
+ *   - makeup multi → "Full-face look"
+ *   - makeup single → "Lips", "Foundation", "Eyeshadow", etc.
+ */
+export function tryOnSectionLabel(t: TryOn): string {
+  if (t.category === 'clothing' && t.clothingZone) {
+    return clothingZoneLabels[t.clothingZone];
+  }
+  if (t.mode === 'multi') return 'Full-face look';
+  return zoneLabels[t.zone] ?? 'Try-on';
+}
+
+/** Full title used for row headings and Share titles. */
+export function tryOnTitleLabel(t: TryOn): string {
+  const noun = t.category === 'clothing' ? 'fit' : 'try-on';
+  return `${tryOnSectionLabel(t)} ${noun}`;
+}
 
 export type WishlistItem = {
   id: string;

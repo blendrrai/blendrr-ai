@@ -4,10 +4,12 @@ import { router, useFocusEffect } from 'expo-router';
 import { ArrowRight, ChevronRight, Droplet, Flower2, ScanLine, ShieldCheck, Sparkles, Wind } from 'lucide-react-native';
 import { Screen } from '../components/Screen';
 import { StepHeader } from '../components/StepHeader';
-import { colors, radius, shadow, spacing, type, zoneLabels } from '../lib/theme';
+import { colors, radius, shadow, spacing, type } from '../lib/theme';
 import {
   loadAnalyses,
   loadHistory,
+  tryOnSectionLabel,
+  tryOnTitleLabel,
   type AnalysisCategory,
   type AnalysisRecord,
   type TryOn,
@@ -145,10 +147,10 @@ function TryOnRow({ item, onOpen }: { item: TryOn; onOpen: () => void }) {
     <Pressable onPress={onOpen} style={[styles.row, shadow.card]}>
       <Image source={{ uri: preview }} style={styles.rowImage} />
       <View style={styles.rowText}>
-        <Text style={styles.rowTitle}>{item.productName ?? `${zoneLabels[item.zone]} try-on`}</Text>
+        <Text style={styles.rowTitle}>{item.productName ?? tryOnTitleLabel(item)}</Text>
         {item.productName && (
           <Text style={styles.rowSummary} numberOfLines={1}>
-            {zoneLabels[item.zone]}
+            {tryOnSectionLabel(item)}
           </Text>
         )}
         <Text style={styles.rowDate}>{formatDate(item.createdAt)}</Text>
