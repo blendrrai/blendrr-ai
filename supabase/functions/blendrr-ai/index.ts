@@ -26,11 +26,13 @@ const OPENAI_IMAGE_MODEL = 'gpt-image-1';
 // To revert, restore the PREVIOUS values noted on each line.
 // ============================================================================
 
-// PREVIOUS: routed dynamically — 'medium' for standard, 'high' for ultra HD.
-// Both tiers now collapse to 'low' since the quality difference at iPhone
-// preview resolution is minimal and the cost/speed win is large
-// (~£0.16 high → ~£0.02 low, ~60s → ~15s).
-const IMAGE_QUALITY: 'low' | 'medium' | 'high' = 'low';
+// History: was routed dynamically ('medium' for standard, 'high' for ultra),
+// then collapsed to 'low' on 2026-05-22 for cost/speed, then bumped to
+// 'medium' on 2026-05-23 because 'low' results were too noticeably softer
+// at iPhone display resolution. Medium hits the sweet spot — visibly
+// sharper than low while staying cheap (~£0.05/try-on vs ~£0.02) and
+// reasonably fast (~25s vs ~15s).
+const IMAGE_QUALITY: 'low' | 'medium' | 'high' = 'medium';
 
 // DISABLED 2026-05-22: OpenAI's /v1/images/edits silently ignored stream=true
 // (returned application/json instead of text/event-stream), so no partial
