@@ -627,123 +627,26 @@ Ultra realistic beauty campaign / iPhone selfie realism. No glam filters, no AI 
 type ClothingZone = 'top' | 'bottom' | 'dress' | 'shoes' | 'jewelry' | 'accessory';
 
 /**
- * Per-zone clothing try-on prompts in the user-requested format. Each prompt
- * is self-contained (no shared template blocks) so the model can't bleed
- * top-swap instructions into bottom-swap behaviour. The user-provided
- * preservation bullets are kept verbatim across all six because they work —
- * what varies per zone is the opening "replace ONLY the X" line, the
- * zone-specific "don't change Y body parts" line, the "remove the original
- * Z" line, and an added preservation bullet for whichever surrounding
- * regions are most likely to drift on that zone.
+ * Per-zone clothing try-on prompts — deliberately short and conversational.
+ *
+ * Why short: gpt-image-1 has strong identity-preservation defaults baked
+ * into the model. Long preservation-heavy prompts can actually backfire by
+ * over-anchoring the model's attention on the body/face — it starts
+ * "thinking about" those features and unintentionally modifies them.
+ * Plain first-person framing ("Show me ... on me") leans on the model's
+ * built-in defaults instead.
+ *
+ * If specific drift modes show up in testing (e.g. always slimming hips on
+ * bottom swaps), add one targeted bullet to that zone's prompt only.
  */
 function buildClothingTryOnPrompt(zone: ClothingZone): string {
   switch (zone) {
-    case 'top':
-      return `Using the attached photo as the base image, replace ONLY the upper-body clothing with the top shown in the reference image.
-
-Critical requirements:
-
-* Preserve the original person's exact face, body shape, proportions, skin tone, muscle tone, posture, hairstyle, hair colour, expression, and pose with no alterations whatsoever.
-* Preserve the original camera angle, perspective, lighting, shadows, reflections, mirror position, phone position, room layout, furniture, floor, walls, windows, desk, wardrobe, and all background details exactly as they appear.
-* Do not slim, enlarge, reshape, smooth, retouch, beautify, age, de-age, or modify the body in any way.
-* Do not change arm shape, shoulder width, bust size, waist size, skin texture, or skin colour.
-* Keep the image photorealistic and indistinguishable from a genuine photograph.
-* The top should fit naturally to the existing body and pose, with realistic fabric folds, tension, shadows, and lighting matching the room.
-* Remove the original top only, replacing it with the new one. Leave the bottoms, shoes, jewelry, and any accessories exactly as they appear in the base image.
-* If the new top has shorter sleeves than the original, reveal the existing arms naturally — do NOT redraw, reshape, or alter the arms in any way.
-* Maintain the same image resolution and composition.
-
-Output: a highly realistic clothing try-on result that looks like the original photo was taken wearing the new top, with absolutely no other changes to the image.`;
-
-    case 'bottom':
-      return `Using the attached photo as the base image, replace ONLY the lower-body clothing with the item shown in the reference image.
-
-Critical requirements:
-
-* Preserve the original person's exact face, body shape, proportions, skin tone, muscle tone, posture, hairstyle, hair colour, expression, and pose with no alterations whatsoever.
-* Preserve the original camera angle, perspective, lighting, shadows, reflections, mirror position, phone position, room layout, furniture, floor, walls, windows, desk, wardrobe, and all background details exactly as they appear.
-* Do not slim, enlarge, reshape, smooth, retouch, beautify, age, de-age, or modify the body in any way.
-* Do not change leg shape, waist size, hip width, thigh width, skin texture, or skin colour.
-* Keep the image photorealistic and indistinguishable from a genuine photograph.
-* The bottoms should fit naturally to the existing body and pose, with realistic fabric folds, tension, shadows, and lighting matching the room.
-* Remove the original bottoms (pants, jeans, skirt, or shorts) only, replacing them with the new item. Leave the top, shoes, jewelry, and any accessories exactly as they appear in the base image.
-* If the new bottoms are shorter than the original (e.g. shorts or a mini skirt replacing full-length pants), reveal the existing legs naturally — do NOT redraw, reshape, slim, tone, or "improve" the legs in any way.
-* The waistband must sit at the person's natural waist as it appears in the base image — do NOT cinch or shape the waist artificially.
-* Maintain the same image resolution and composition.
-
-Output: a highly realistic clothing try-on result that looks like the original photo was taken wearing the new bottoms, with absolutely no other changes to the image.`;
-
-    case 'dress':
-      return `Using the attached photo as the base image, replace ONLY the outfit with the dress or jumpsuit shown in the reference image.
-
-Critical requirements:
-
-* Preserve the original person's exact face, body shape, proportions, skin tone, muscle tone, posture, hairstyle, hair colour, expression, and pose with no alterations whatsoever.
-* Preserve the original camera angle, perspective, lighting, shadows, reflections, mirror position, phone position, room layout, furniture, floor, walls, windows, desk, wardrobe, and all background details exactly as they appear.
-* Do not slim, enlarge, reshape, smooth, retouch, beautify, age, de-age, or modify the body in any way.
-* Do not change leg shape, waist size, hip width, bust size, shoulder width, height, skin texture, or skin colour.
-* Keep the image photorealistic and indistinguishable from a genuine photograph.
-* The garment should fit naturally to the existing body and pose, with realistic fabric folds, tension, shadows, and lighting matching the room.
-* Remove the original top and bottoms, replacing them with the new garment. Leave the shoes, jewelry, and any accessories exactly as they appear in the base image.
-* The garment must adapt to the person's REAL body — do NOT model-ify, idealise, or reshape the body to fit the garment. The body stays exactly the same; the garment drapes to it.
-* Body parts NOT covered by the new garment (e.g. lower legs below a knee-length dress, arms below short sleeves) must look IDENTICAL to the base image.
-* Maintain the same image resolution and composition.
-
-Output: a highly realistic clothing try-on result that looks like the original photo was taken wearing the new garment, with absolutely no other changes to the image.`;
-
-    case 'shoes':
-      return `Using the attached photo as the base image, replace ONLY the shoes with the pair shown in the reference image.
-
-Critical requirements:
-
-* Preserve the original person's exact face, body shape, proportions, skin tone, muscle tone, posture, hairstyle, hair colour, expression, and pose with no alterations whatsoever.
-* Preserve the original camera angle, perspective, lighting, shadows, reflections, mirror position, phone position, room layout, furniture, floor, walls, windows, desk, wardrobe, and all background details exactly as they appear.
-* Do not slim, enlarge, reshape, smooth, retouch, beautify, age, de-age, or modify the body in any way.
-* Do not change leg shape, ankle shape, foot shape, height, posture, or stance.
-* Keep the image photorealistic and indistinguishable from a genuine photograph.
-* The shoes should sit naturally on the existing feet, with realistic shadows and ground contact matching the floor in the base image.
-* Remove the original shoes only, replacing them with the new pair. Leave all clothing, jewelry, and accessories exactly as they appear.
-* If the new shoes have a different height to the originals (e.g. heels replacing flats), do NOT adjust the person's height, leg length, or stance to compensate. The person stays the same; only the footwear changes.
-* Maintain the same image resolution and composition.
-
-Output: a highly realistic clothing try-on result that looks like the original photo was taken wearing the new shoes, with absolutely no other changes to the image.`;
-
-    case 'jewelry':
-      return `Using the attached photo as the base image, add ONLY the jewelry item shown in the reference image to the appropriate body part.
-
-Critical requirements:
-
-* Preserve the original person's exact face, body shape, proportions, skin tone, muscle tone, posture, hairstyle, hair colour, expression, and pose with no alterations whatsoever.
-* Preserve the original camera angle, perspective, lighting, shadows, reflections, mirror position, phone position, room layout, furniture, floor, walls, windows, desk, wardrobe, and all background details exactly as they appear.
-* Do not slim, enlarge, reshape, smooth, retouch, beautify, age, de-age, or modify the body in any way.
-* Do not change neck width, finger shape, wrist size, ear shape, hand shape, skin texture, or skin colour.
-* Keep the image photorealistic and indistinguishable from a genuine photograph.
-* The jewelry should sit naturally on the body, with realistic shine, reflections, shadows, and lighting matching the room.
-* Add the jewelry in its natural placement based on type: necklace on the chest / collarbones, earrings on the ears, bracelet on a wrist, ring on a finger, anklet on an ankle.
-* Leave all clothing, shoes, accessories, and other body areas exactly as they appear in the base image.
-* Do NOT remove existing jewelry unless it directly conflicts with the new piece (e.g. swapping one necklace for another).
-* Maintain the same image resolution and composition.
-
-Output: a highly realistic try-on result that looks like the original photo was taken wearing the new jewelry, with absolutely no other changes to the image.`;
-
-    case 'accessory':
-      return `Using the attached photo as the base image, add ONLY the accessory shown in the reference image to the appropriate part of the person.
-
-Critical requirements:
-
-* Preserve the original person's exact face, body shape, proportions, skin tone, muscle tone, posture, hairstyle, hair colour, expression, and pose with no alterations whatsoever.
-* Preserve the original camera angle, perspective, lighting, shadows, reflections, mirror position, phone position, room layout, furniture, floor, walls, windows, desk, wardrobe, and all background details exactly as they appear.
-* Do not slim, enlarge, reshape, smooth, retouch, beautify, age, de-age, or modify the body in any way.
-* Do not change hand shape, head shape, neck width, face shape, eye shape, skin texture, or skin colour.
-* Keep the image photorealistic and indistinguishable from a genuine photograph.
-* The accessory should sit naturally where it would in real life, with realistic shadows and lighting matching the room.
-* Add the accessory in its natural placement based on type: bag in a hand or on a shoulder, hat on the head over the existing hair, scarf around the neck, sunglasses over the existing eyes, belt around the waistband of whatever bottoms are being worn, headband in the hair, gloves on the hands.
-* Leave all clothing, shoes, jewelry, and other accessories exactly as they appear in the base image.
-* For sunglasses: do NOT redraw or alter the eyes underneath — the lenses simply sit over them. Any visible eye makeup remains identical.
-* For hats: do NOT change the hair underneath — it tucks under or around the hat naturally.
-* Maintain the same image resolution and composition.
-
-Output: a highly realistic try-on result that looks like the original photo was taken wearing the new accessory, with absolutely no other changes to the image.`;
+    case 'top':       return 'Show me this top on me.';
+    case 'bottom':    return 'Show me these bottoms on me.';
+    case 'dress':     return 'Show me this outfit on me.';
+    case 'shoes':     return 'Show me these shoes on me.';
+    case 'jewelry':   return 'Show me this jewelry on me.';
+    case 'accessory': return 'Show me this accessory on me.';
   }
 }
 
