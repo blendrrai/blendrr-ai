@@ -626,217 +626,124 @@ Ultra realistic beauty campaign / iPhone selfie realism. No glam filters, no AI 
 
 type ClothingZone = 'top' | 'bottom' | 'dress' | 'shoes' | 'jewelry' | 'accessory';
 
-// Universal preservation block — applied at the end of every clothing prompt
-// because gpt-image weights the END of the prompt about as strongly as the
-// start. Repeating the body/face lock here AND in each zone's TASK section
-// is what stops the model drifting toward "idealised" output.
-const CLOTHING_HARD_LOCK = `HARD LOCK — DO NOT CHANGE (any one of these is grounds for a failed result):
-- FACE: every facial feature must be PIXEL-IDENTICAL to Image 1. Eyes, eyebrows, lips, nose, jawline, cheekbones, expression, any visible makeup. Do NOT retouch, beautify, smooth, slim, or restructure the face in any way.
-- HAIR: colour, style, length, parting, fly-aways, baby hairs — identical to Image 1.
-- SKIN TONE: hue, brightness, saturation, undertone (warm / cool / neutral / olive). Identical across every visible patch of skin (face, neck, arms, legs, hands, feet). Do NOT tan, lighten, even out, or shift the undertone.
-- SKIN DETAIL: freckles, moles, scars, tattoos, birthmarks, blemishes, body hair. Identical.
-- BODY SHAPE & SIZE: height, weight, build, muscle definition, waist, hips, bust, shoulder width, arm thickness, leg shape. Do NOT slim, thicken, lengthen, shorten, tone, sculpt, or otherwise reshape the body in ANY way. The person's silhouette must remain identical.
-- POSE: stance, head angle, where the hands are, where the feet are. Identical.
-- BACKGROUND: every pixel outside the person and the edited clothing region must be identical to Image 1.
-- LIGHTING: direction, intensity, shadows on the body, colour temperature. Identical.
-- FRAMING: aspect ratio, crop, zoom level, the body parts visible vs. not visible. If the original is waist-up, the output is waist-up — do NOT generate body parts that weren't shown.
-
-YOUR ONLY JOB is to fit the product from Image 2 onto the person from Image 1, in the specified zone only. Everything else is locked.`;
-
-const CLOTHING_REALISM = `OUTPUT STYLE:
-Photorealistic, like an unedited iPhone photo of the same person now wearing the item. No filters, no glow, no "AI sheen", no smoothing, no glam. The product should drape and fall naturally — fabric folds, shadows, fit around the body — like a real garment, not a sticker pasted onto the photo.`;
-
-// Per-zone fully-written prompt. Each one defines the exact edit region, the
-// item type expected, and a tight set of "untouchables" specific to that
-// zone — so the AI knows e.g. that a top swap MUST NOT touch the bottoms
-// even if the photo shows both. These are not templated; each is hand-tuned
-// so the model can't bleed instructions across zones.
+/**
+ * Per-zone clothing try-on prompts in the user-requested format. Each prompt
+ * is self-contained (no shared template blocks) so the model can't bleed
+ * top-swap instructions into bottom-swap behaviour. The user-provided
+ * preservation bullets are kept verbatim across all six because they work —
+ * what varies per zone is the opening "replace ONLY the X" line, the
+ * zone-specific "don't change Y body parts" line, the "remove the original
+ * Z" line, and an added preservation bullet for whichever surrounding
+ * regions are most likely to drift on that zone.
+ */
 function buildClothingTryOnPrompt(zone: ClothingZone): string {
   switch (zone) {
     case 'top':
-      return `You are a professional fashion AI image editor.
+      return `Using the attached photo as the base image, replace ONLY the upper-body clothing with the top shown in the reference image.
 
-TASK — UPPER-BODY CLOTHING SWAP:
-You are given two images.
-- Image 1: a photo of a person.
-- Image 2: a single clothing item — a top, shirt, blouse, jumper, jacket, hoodie, or similar upper-body garment.
+Critical requirements:
 
-Replace the upper-body clothing the person is currently wearing in Image 1 with the item from Image 2.
+* Preserve the original person's exact face, body shape, proportions, skin tone, muscle tone, posture, hairstyle, hair colour, expression, and pose with no alterations whatsoever.
+* Preserve the original camera angle, perspective, lighting, shadows, reflections, mirror position, phone position, room layout, furniture, floor, walls, windows, desk, wardrobe, and all background details exactly as they appear.
+* Do not slim, enlarge, reshape, smooth, retouch, beautify, age, de-age, or modify the body in any way.
+* Do not change arm shape, shoulder width, bust size, waist size, skin texture, or skin colour.
+* Keep the image photorealistic and indistinguishable from a genuine photograph.
+* The top should fit naturally to the existing body and pose, with realistic fabric folds, tension, shadows, and lighting matching the room.
+* Remove the original top only, replacing it with the new one. Leave the bottoms, shoes, jewelry, and any accessories exactly as they appear in the base image.
+* If the new top has shorter sleeves than the original, reveal the existing arms naturally — do NOT redraw, reshape, or alter the arms in any way.
+* Maintain the same image resolution and composition.
 
-EDIT REGION:
-- ONLY the area from the collarbones / shoulders down to the natural waistline, including the sleeves.
-- NOTHING above the collarbones may change.
-- NOTHING below the waistline may change.
-
-ITEM HANDLING:
-- Read the product's colour, pattern, fabric texture, material, and silhouette directly from Image 2. Use the actual garment, NOT any model wearing it.
-- Drape the top realistically over the person's existing torso and arms — natural folds, correct fit at the shoulders, sleeves resting where they would in real life.
-- If the new top has shorter sleeves than what the person was wearing, the arms that are now exposed must be the SAME arms as in Image 1 — same skin tone, same shape, same hair, same freckles. Do NOT redraw, reshape, lengthen, slim, or "improve" the arms.
-- If the new top reveals different parts of the neck / chest than the original (e.g. a v-neck replacing a crewneck), the newly-visible skin must match the surrounding skin exactly.
-
-${CLOTHING_HARD_LOCK}
-
-ZONE-SPECIFIC LOCKS for top-half swaps:
-- The bottoms (trousers, skirt, etc.) must remain identical.
-- The shoes must remain identical.
-- Any accessories (bag, belt, necklace, watch) must remain in place.
-
-${CLOTHING_REALISM}`;
+Output: a highly realistic clothing try-on result that looks like the original photo was taken wearing the new top, with absolutely no other changes to the image.`;
 
     case 'bottom':
-      return `You are a professional fashion AI image editor.
+      return `Using the attached photo as the base image, replace ONLY the lower-body clothing with the item shown in the reference image.
 
-TASK — LOWER-BODY CLOTHING SWAP:
-You are given two images.
-- Image 1: a photo of a person.
-- Image 2: a single clothing item — trousers, jeans, shorts, a skirt, leggings, or similar lower-body garment.
+Critical requirements:
 
-Replace the lower-body clothing the person is currently wearing in Image 1 with the item from Image 2.
+* Preserve the original person's exact face, body shape, proportions, skin tone, muscle tone, posture, hairstyle, hair colour, expression, and pose with no alterations whatsoever.
+* Preserve the original camera angle, perspective, lighting, shadows, reflections, mirror position, phone position, room layout, furniture, floor, walls, windows, desk, wardrobe, and all background details exactly as they appear.
+* Do not slim, enlarge, reshape, smooth, retouch, beautify, age, de-age, or modify the body in any way.
+* Do not change leg shape, waist size, hip width, thigh width, skin texture, or skin colour.
+* Keep the image photorealistic and indistinguishable from a genuine photograph.
+* The bottoms should fit naturally to the existing body and pose, with realistic fabric folds, tension, shadows, and lighting matching the room.
+* Remove the original bottoms (pants, jeans, skirt, or shorts) only, replacing them with the new item. Leave the top, shoes, jewelry, and any accessories exactly as they appear in the base image.
+* If the new bottoms are shorter than the original (e.g. shorts or a mini skirt replacing full-length pants), reveal the existing legs naturally — do NOT redraw, reshape, slim, tone, or "improve" the legs in any way.
+* The waistband must sit at the person's natural waist as it appears in the base image — do NOT cinch or shape the waist artificially.
+* Maintain the same image resolution and composition.
 
-EDIT REGION:
-- ONLY the area from the natural waistline down to the ankles.
-- NOTHING above the waistline may change.
-- NOTHING below the ankles may change.
-
-ITEM HANDLING:
-- Read the product's colour, pattern, fabric, material, and silhouette directly from Image 2.
-- Drape the item realistically over the person's existing hips, legs, and waistline — natural fit, correct length, correct fabric behaviour.
-- If the new item is shorter than what the person was wearing (e.g. shorts replacing full-length jeans, a mini skirt replacing pants), the legs that are now exposed must be the SAME legs as in Image 1 — same skin tone, same shape, same body hair, same proportions. Do NOT redraw, reshape, slim, lengthen, tone, or "improve" the legs.
-
-${CLOTHING_HARD_LOCK}
-
-ZONE-SPECIFIC LOCKS for bottom-half swaps:
-- The top (shirt, jacket, etc.) must remain identical.
-- The shoes must remain identical.
-- The waistband sits at the person's actual waist — do NOT artificially cinch or shape the waist.
-
-${CLOTHING_REALISM}`;
+Output: a highly realistic clothing try-on result that looks like the original photo was taken wearing the new bottoms, with absolutely no other changes to the image.`;
 
     case 'dress':
-      return `You are a professional fashion AI image editor.
+      return `Using the attached photo as the base image, replace ONLY the outfit with the dress or jumpsuit shown in the reference image.
 
-TASK — FULL-OUTFIT SWAP:
-You are given two images.
-- Image 1: a photo of a person.
-- Image 2: a single garment that covers both upper and lower body — a dress, jumpsuit, romper, co-ord, gown, or similar.
+Critical requirements:
 
-Replace the person's current outfit (whatever they're wearing on top and bottom) with the garment from Image 2.
+* Preserve the original person's exact face, body shape, proportions, skin tone, muscle tone, posture, hairstyle, hair colour, expression, and pose with no alterations whatsoever.
+* Preserve the original camera angle, perspective, lighting, shadows, reflections, mirror position, phone position, room layout, furniture, floor, walls, windows, desk, wardrobe, and all background details exactly as they appear.
+* Do not slim, enlarge, reshape, smooth, retouch, beautify, age, de-age, or modify the body in any way.
+* Do not change leg shape, waist size, hip width, bust size, shoulder width, height, skin texture, or skin colour.
+* Keep the image photorealistic and indistinguishable from a genuine photograph.
+* The garment should fit naturally to the existing body and pose, with realistic fabric folds, tension, shadows, and lighting matching the room.
+* Remove the original top and bottoms, replacing them with the new garment. Leave the shoes, jewelry, and any accessories exactly as they appear in the base image.
+* The garment must adapt to the person's REAL body — do NOT model-ify, idealise, or reshape the body to fit the garment. The body stays exactly the same; the garment drapes to it.
+* Body parts NOT covered by the new garment (e.g. lower legs below a knee-length dress, arms below short sleeves) must look IDENTICAL to the base image.
+* Maintain the same image resolution and composition.
 
-EDIT REGION:
-- The entire clothed body area — from the natural neckline / shoulders down to wherever the garment ends (above the knee, ankle-length, etc.).
-- NOTHING above the neckline may change.
-- NOTHING below the garment hem may change.
-
-ITEM HANDLING:
-- Read the garment's colour, pattern, fabric, material, neckline, sleeve length, hemline, and silhouette directly from Image 2.
-- Fit the garment to the person's REAL body — their actual shoulder width, bust, waist, hip, height. Do NOT slim, lengthen, idealise, or model-ify the body to fit the garment. The garment must adapt to the body, not the other way around.
-- Drape, folds, and movement of the fabric should feel natural for the person's pose and lighting.
-
-${CLOTHING_HARD_LOCK}
-
-ZONE-SPECIFIC LOCKS for full-outfit swaps:
-- Hair, head, face, neck above the collarbones — untouched.
-- Hands, fingers, nails, and any visible jewelry on hands — untouched unless the garment has long sleeves that cover them naturally.
-- Feet and shoes — untouched.
-- Body parts NOT covered by the new garment (e.g. the lower legs if it's a knee-length dress) must look IDENTICAL to Image 1.
-
-${CLOTHING_REALISM}`;
+Output: a highly realistic clothing try-on result that looks like the original photo was taken wearing the new garment, with absolutely no other changes to the image.`;
 
     case 'shoes':
-      return `You are a professional fashion AI image editor.
+      return `Using the attached photo as the base image, replace ONLY the shoes with the pair shown in the reference image.
 
-TASK — SHOE SWAP:
-You are given two images.
-- Image 1: a photo of a person.
-- Image 2: a single pair of shoes — trainers, heels, boots, sandals, loafers, or similar footwear.
+Critical requirements:
 
-Replace the shoes the person is currently wearing in Image 1 with the pair from Image 2.
+* Preserve the original person's exact face, body shape, proportions, skin tone, muscle tone, posture, hairstyle, hair colour, expression, and pose with no alterations whatsoever.
+* Preserve the original camera angle, perspective, lighting, shadows, reflections, mirror position, phone position, room layout, furniture, floor, walls, windows, desk, wardrobe, and all background details exactly as they appear.
+* Do not slim, enlarge, reshape, smooth, retouch, beautify, age, de-age, or modify the body in any way.
+* Do not change leg shape, ankle shape, foot shape, height, posture, or stance.
+* Keep the image photorealistic and indistinguishable from a genuine photograph.
+* The shoes should sit naturally on the existing feet, with realistic shadows and ground contact matching the floor in the base image.
+* Remove the original shoes only, replacing them with the new pair. Leave all clothing, jewelry, and accessories exactly as they appear.
+* If the new shoes have a different height to the originals (e.g. heels replacing flats), do NOT adjust the person's height, leg length, or stance to compensate. The person stays the same; only the footwear changes.
+* Maintain the same image resolution and composition.
 
-EDIT REGION:
-- ONLY the shoes on the feet.
-- The edit boundary is the ankle. NOTHING above the ankle may change.
-
-ITEM HANDLING:
-- Read the shoes' colour, material (leather, canvas, suede, etc.), shape, and style directly from Image 2. Match shoe orientation to how the person's feet are pointing in Image 1.
-- Position the shoes naturally on whatever surface the person is standing on, matching the original shadows and ground contact.
-- If the new shoes have different height to the originals (e.g. heels replacing flats), do NOT change the person's height, leg length, posture, or stance to compensate. The person stays the same; only the footwear changes.
-
-${CLOTHING_HARD_LOCK}
-
-ZONE-SPECIFIC LOCKS for shoe swaps:
-- Legs, ankles, feet shape — IDENTICAL to Image 1.
-- All clothing — IDENTICAL.
-- The floor / ground / background — IDENTICAL.
-
-${CLOTHING_REALISM}`;
+Output: a highly realistic clothing try-on result that looks like the original photo was taken wearing the new shoes, with absolutely no other changes to the image.`;
 
     case 'jewelry':
-      return `You are a professional fashion AI image editor.
+      return `Using the attached photo as the base image, add ONLY the jewelry item shown in the reference image to the appropriate body part.
 
-TASK — ADD JEWELRY:
-You are given two images.
-- Image 1: a photo of a person.
-- Image 2: a single piece of jewelry — necklace, earring(s), bracelet, ring, anklet, or similar.
+Critical requirements:
 
-Add the jewelry from Image 2 onto the appropriate body part of the person in Image 1.
+* Preserve the original person's exact face, body shape, proportions, skin tone, muscle tone, posture, hairstyle, hair colour, expression, and pose with no alterations whatsoever.
+* Preserve the original camera angle, perspective, lighting, shadows, reflections, mirror position, phone position, room layout, furniture, floor, walls, windows, desk, wardrobe, and all background details exactly as they appear.
+* Do not slim, enlarge, reshape, smooth, retouch, beautify, age, de-age, or modify the body in any way.
+* Do not change neck width, finger shape, wrist size, ear shape, hand shape, skin texture, or skin colour.
+* Keep the image photorealistic and indistinguishable from a genuine photograph.
+* The jewelry should sit naturally on the body, with realistic shine, reflections, shadows, and lighting matching the room.
+* Add the jewelry in its natural placement based on type: necklace on the chest / collarbones, earrings on the ears, bracelet on a wrist, ring on a finger, anklet on an ankle.
+* Leave all clothing, shoes, accessories, and other body areas exactly as they appear in the base image.
+* Do NOT remove existing jewelry unless it directly conflicts with the new piece (e.g. swapping one necklace for another).
+* Maintain the same image resolution and composition.
 
-EDIT REGION (based on the jewelry type):
-- Necklace → resting on the chest / collarbones over whatever the person is wearing.
-- Earrings → on the ears (both ears if it's a pair).
-- Bracelet → on a wrist.
-- Ring → on a finger.
-- Anklet → on the ankle.
-
-ONLY the area where the jewelry sits may change.
-
-ITEM HANDLING:
-- Read the jewelry's material (gold, silver, rose gold, beads, stones), shape, and pattern directly from Image 2.
-- Render the metal / stones with realistic shine and reflections that match Image 1's lighting.
-- Do NOT remove any existing jewelry the person is already wearing UNLESS it directly conflicts (e.g. swapping one necklace for another).
-
-${CLOTHING_HARD_LOCK}
-
-ZONE-SPECIFIC LOCKS for jewelry additions:
-- Face, hair, ears (other than where earrings attach) — IDENTICAL.
-- Clothing — IDENTICAL.
-- Hands, fingers, wrists shape — IDENTICAL except for the chosen ring / bracelet placement.
-
-${CLOTHING_REALISM}`;
+Output: a highly realistic try-on result that looks like the original photo was taken wearing the new jewelry, with absolutely no other changes to the image.`;
 
     case 'accessory':
-      return `You are a professional fashion AI image editor.
+      return `Using the attached photo as the base image, add ONLY the accessory shown in the reference image to the appropriate part of the person.
 
-TASK — ADD ACCESSORY:
-You are given two images.
-- Image 1: a photo of a person.
-- Image 2: a single accessory — handbag, hat, cap, scarf, sunglasses, belt, headband, gloves, or similar.
+Critical requirements:
 
-Add the accessory from Image 2 to the person in Image 1, placed where that type of accessory naturally sits.
+* Preserve the original person's exact face, body shape, proportions, skin tone, muscle tone, posture, hairstyle, hair colour, expression, and pose with no alterations whatsoever.
+* Preserve the original camera angle, perspective, lighting, shadows, reflections, mirror position, phone position, room layout, furniture, floor, walls, windows, desk, wardrobe, and all background details exactly as they appear.
+* Do not slim, enlarge, reshape, smooth, retouch, beautify, age, de-age, or modify the body in any way.
+* Do not change hand shape, head shape, neck width, face shape, eye shape, skin texture, or skin colour.
+* Keep the image photorealistic and indistinguishable from a genuine photograph.
+* The accessory should sit naturally where it would in real life, with realistic shadows and lighting matching the room.
+* Add the accessory in its natural placement based on type: bag in a hand or on a shoulder, hat on the head over the existing hair, scarf around the neck, sunglasses over the existing eyes, belt around the waistband of whatever bottoms are being worn, headband in the hair, gloves on the hands.
+* Leave all clothing, shoes, jewelry, and other accessories exactly as they appear in the base image.
+* For sunglasses: do NOT redraw or alter the eyes underneath — the lenses simply sit over them. Any visible eye makeup remains identical.
+* For hats: do NOT change the hair underneath — it tucks under or around the hat naturally.
+* Maintain the same image resolution and composition.
 
-EDIT REGION (based on accessory type):
-- Bag / purse → in a hand, on a shoulder, or crossed over the body.
-- Hat / cap → on top of the head, resting on the existing hair.
-- Scarf → around the neck or shoulders.
-- Sunglasses → on the face, covering the eyes (the eyes underneath remain identical — the lenses simply sit over them).
-- Headband / hair clip → in the hair at the appropriate position.
-- Belt → around the waistband of whatever bottoms are being worn.
-- Gloves → on the hands.
-
-ONLY the area where the accessory sits may change.
-
-ITEM HANDLING:
-- Read the accessory's colour, material, shape, and details directly from Image 2.
-- Position it naturally with correct scale and orientation to the person's body.
-- Match the accessory's shadows and highlights to Image 1's lighting.
-
-${CLOTHING_HARD_LOCK}
-
-ZONE-SPECIFIC LOCKS for accessory additions:
-- Face, hair, body, clothing — IDENTICAL except for the accessory's footprint.
-- For sunglasses: do NOT redraw the eyes underneath. The eyes are simply hidden by the lenses; their shape, position, and any visible eye makeup remain the same as Image 1.
-- For hats: do NOT change the hair underneath. Hair simply tucks under or sits around the hat as in real life.
-
-${CLOTHING_REALISM}`;
+Output: a highly realistic try-on result that looks like the original photo was taken wearing the new accessory, with absolutely no other changes to the image.`;
   }
 }
 
