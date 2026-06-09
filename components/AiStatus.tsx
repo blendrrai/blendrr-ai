@@ -3,17 +3,37 @@ import { router } from 'expo-router';
 import { AlertCircle, Sparkles } from 'lucide-react-native';
 import Animated, {
   Easing,
+  FadeIn,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { colors, radius, shadow, spacing, type } from '../lib/theme';
 
-export function AiLoading({ label, hint }: { label: string; hint?: string }) {
+const LABEL_INTERVAL_MS = 2500;
+
+/**
+ * Loading panel for AI-driven flows. Accepts either:
+ *   - `label`: a single static string (legacy callers).
+ *   - `labels`: a rotating array — each entry shows for ~2.5s with a soft
+ *     fade transition between, so the screen never feels stuck on one
+ *     message. Useful when the underlying request takes 10-60s.
+ */
+export function AiLoading({
+  label,
+  labels,
+  hint,
+}: {
+  label?: string;
+  labels?: readonly string[];
+  hint?: string;
+}) {
   const rotate = useSharedValue(0);
   const breathe = useSharedValue(0);
+  const [labelIdx, setLabelIdx] = useState(0);
+
   useEffect(() => {
     // Continuous spin via a very long single timing — avoids any repeat boundary snap
     rotate.value = withTiming(10000, { duration: 2200 * 10000, easing: Easing.linear });
@@ -23,6 +43,17 @@ export function AiLoading({ label, hint }: { label: string; hint?: string }) {
       true,
     );
   }, [rotate, breathe]);
+
+  // Rotate through `labels` every LABEL_INTERVAL_MS. When the list runs out,
+  // wrap around so longer-than-expected requests still feel alive.
+  useEffect(() => {
+    if (!labels || labels.length <= 1) return;
+    const t = setInterval(() => {
+      setLabelIdx((i) => (i + 1) % labels.length);
+    }, LABEL_INTERVAL_MS);
+    return () => clearInterval(t);
+  }, [labels]);
+
   const style = useAnimatedStyle(() => ({
     transform: [
       { rotate: `${(rotate.value * 36) % 360}deg` },
@@ -30,12 +61,22 @@ export function AiLoading({ label, hint }: { label: string; hint?: string }) {
     ],
   }));
 
+  const currentLabel = labels?.[labelIdx] ?? label ?? 'Loading…';
+
   return (
     <View style={[styles.panel, shadow.card]}>
       <Animated.View style={[styles.iconRing, style]}>
         <Sparkles size={32} color={colors.primary} strokeWidth={1.6} />
       </Animated.View>
-      <Text style={styles.title}>{label}</Text>
+      {/* key={labelIdx} forces a remount on label change so the FadeIn
+          entering animation fires for each new message. */}
+      <Animated.Text
+        key={labelIdx}
+        entering={FadeIn.duration(450)}
+        style={styles.title}
+      >
+        {currentLabel}
+      </Animated.Text>
       <Text style={styles.body}>{hint ?? 'This usually takes 10–30 seconds. Keep the app open.'}</Text>
     </View>
   );

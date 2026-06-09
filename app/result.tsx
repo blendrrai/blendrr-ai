@@ -22,10 +22,23 @@ type State =
   | { kind: 'error'; message: string }
   | { kind: 'no-credits'; reason: string };
 
+/**
+ * Rotating loader messages — cycle every ~2.5s while the AI is generating.
+ * Sequenced from "first step of the try-on pipeline" to "almost done" so the
+ * user feels concrete progress even though we have no real progress signal.
+ */
+const LOADING_LABELS = [
+  'Reading the shade…',
+  'Mapping your features…',
+  'Mixing the perfect tone…',
+  'Blending it onto your skin…',
+  'Smoothing the finish…',
+  'Adding that final glow ✨',
+] as const;
+
 export default function ResultScreen() {
   const { selfieUri, productUris, productUrls, zone, mode, quality, resetTryOn } = useLook();
   const [state, setState] = useState<State>({ kind: 'loading' });
-  const [view, setView] = useState<'before' | 'after'>('after');
   const [saving, setSaving] = useState(false);
   const [enlargedUri, setEnlargedUri] = useState<string | null>(null);
   const [savedToRoll, setSavedToRoll] = useState(false);
@@ -97,7 +110,6 @@ export default function ResultScreen() {
             // on the next render of the home tab or achievements screen.
             checkAchievements().catch(() => {});
             setState({ kind: 'ok', uri: resultUri });
-            setView('after');
             return;
           }
         }
@@ -208,7 +220,7 @@ export default function ResultScreen() {
   const startOver = () => confirmLeave(goHome);
   const backHome = () => confirmLeave(goHome);
 
-  const displayUri = view === 'before' ? selfieUri : state.kind === 'ok' ? state.uri : null;
+  const displayUri = state.kind === 'ok' ? state.uri : null;
 
   const loadingHint = quality === 'ultra'
     ? "Ultra HD try-ons take 40 seconds to 1 minute — we're getting every detail pixel-perfect. You can swipe to another app, but don't close BLENDRR."
@@ -229,7 +241,7 @@ export default function ResultScreen() {
       >
         {state.kind === 'loading' && !state.partialUri && (
           <AiLoading
-            label="Blending your shade…"
+            labels={LOADING_LABELS}
             hint={loadingHint}
           />
         )}
@@ -255,11 +267,6 @@ export default function ResultScreen() {
             {displayUri && (
               <Image source={{ uri: displayUri }} style={styles.image} resizeMode="cover" />
             )}
-
-            <View style={styles.toggle}>
-              <ToggleSeg label="Before" active={view === 'before'} onPress={() => setView('before')} />
-              <ToggleSeg label="After" active={view === 'after'} onPress={() => setView('after')} />
-            </View>
 
             {displayUri && (
               <EnlargeButton
@@ -344,22 +351,6 @@ export default function ResultScreen() {
   );
 }
 
-function ToggleSeg({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable onPress={onPress} style={[styles.toggleSeg, active && styles.toggleSegActive]}>
-      <Text style={[styles.toggleLabel, active && styles.toggleLabelActive]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 function Thumb({
   uri,
   label,
@@ -396,29 +387,6 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   image: { width: '100%', aspectRatio: 1 },
-  toggle: {
-    position: 'absolute',
-    top: spacing.md,
-    left: spacing.md,
-    flexDirection: 'row',
-    backgroundColor: 'rgba(10,10,10,0.72)',
-    borderRadius: radius.pill,
-    padding: 4,
-    gap: 2,
-  },
-  toggleSeg: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-  },
-  toggleSegActive: { backgroundColor: colors.primaryOn },
-  toggleLabel: {
-    ...type.caption,
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  toggleLabelActive: { color: colors.text },
   enlargeOverlay: {
     position: 'absolute',
     top: spacing.md,
