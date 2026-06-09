@@ -15,7 +15,7 @@ export default function SelfieStep() {
   return (
     <Screen>
       <StepHeader
-        step="Step 1 of 5"
+        step="Step 1 of 4"
         title="Drop a selfie"
         subtitle="Front-facing, soft light, hair pulled back if you're trying lips or face shades."
         showHomeButton

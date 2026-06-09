@@ -104,7 +104,12 @@ export default function GlowScreen() {
         subtitle="Tick off your daily rituals to grow your glow."
       />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={[styles.scoreCard, shadow.card]}>
           <View style={styles.scoreRow}>
             <View style={styles.scoreIconWrap}>

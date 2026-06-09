@@ -24,15 +24,31 @@ type State =
 
 /**
  * Rotating loader messages — cycle every ~2.5s while the AI is generating.
- * Sequenced from "first step of the try-on pipeline" to "almost done" so the
- * user feels concrete progress even though we have no real progress signal.
+ * Sequenced loosely from "first step" to "final touches" so the user feels
+ * concrete progress, even though there's no real progress signal.
+ *
+ * 18 messages × 2.5s = ~45s per full cycle, which roughly matches the Ultra
+ * HD generation time — most users see each message once and never feel
+ * stuck on the same text.
  */
 const LOADING_LABELS = [
   'Reading the shade…',
+  'Sampling the colour…',
   'Mapping your features…',
-  'Mixing the perfect tone…',
-  'Blending it onto your skin…',
-  'Smoothing the finish…',
+  'Studying the lighting…',
+  'Locking in your skin tone…',
+  'Mixing the perfect pigment…',
+  'Matching the undertone…',
+  'Brushing it onto your lips…',
+  'Blending into your skin…',
+  'Smoothing the edges…',
+  'Catching the light just right…',
+  'Refining the texture…',
+  'Polishing the finish…',
+  'Adjusting for your unique tone…',
+  'Almost picture-perfect…',
+  'Bringing it all together…',
+  'Just a touch more polish…',
   'Adding that final glow ✨',
 ] as const;
 

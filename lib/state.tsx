@@ -65,7 +65,9 @@ export function LookProvider({ children }: { children: ReactNode }) {
   const [productUrls, setProductUrls] = useState<(string | null)[]>([]);
   const [zone, setZone] = useState<Zone>('lips');
   const [mode, setModeState] = useState<Mode>('single');
-  const [quality, setQuality] = useState<Quality>('medium');
+  // Always 'ultra' — quality picker screen was removed. setQuality stays
+  // exposed for compatibility but isn't invoked from any current flow.
+  const [quality, setQuality] = useState<Quality>('ultra');
 
   const [routineAnswers, setAllAnswers] = useState<Record<RoutineCategory, Answers>>(emptyAnswers);
   const [routinePhotos, setAllPhotos] = useState<Record<RoutineCategory, string | null>>(emptyPhotos);

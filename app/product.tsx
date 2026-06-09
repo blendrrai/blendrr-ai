@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -7,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowRight, Plus, X } from 'lucide-react-native';
+import { Plus, Wand2, X } from 'lucide-react-native';
 import { Screen } from '../components/Screen';
 import { StepHeader } from '../components/StepHeader';
 import { PhotoSlot } from '../components/PhotoSlot';
@@ -15,9 +18,13 @@ import { Button } from '../components/Button';
 import { colors, MAX_PRODUCTS_MULTI, radius, shadow, spacing, type } from '../lib/theme';
 import { useLook } from '../lib/state';
 import { presentPickerSheet } from '../lib/pickImage';
+import { startTryOn } from '../lib/blendrr';
+import { canUseCredit } from '../lib/storage';
+import { scheduleTryOnReadyNotification } from '../lib/notifications';
 
 export default function ProductStep() {
-  const { mode, productUris, addProduct, removeProduct, replaceProduct } = useLook();
+  const { selfieUri, mode, zone, quality, productUris, addProduct, removeProduct, replaceProduct } = useLook();
+  const [submitting, setSubmitting] = useState(false);
 
   const isSingle = mode === 'single';
   const canAddMore = isSingle ? productUris.length === 0 : productUris.length < MAX_PRODUCTS_MULTI;
@@ -38,12 +45,38 @@ export default function ProductStep() {
     });
   };
 
-  const continueDisabled = productUris.length === 0;
+  const continueDisabled = productUris.length === 0 || submitting;
+
+  const handleVisualize = async () => {
+    if (!selfieUri || productUris.length === 0) {
+      Alert.alert('Missing inputs', 'Please add a selfie and at least one product.');
+      return;
+    }
+    setSubmitting(true);
+    const credit = await canUseCredit();
+    if (!credit.ok) {
+      setSubmitting(false);
+      Alert.alert('Out of credits', credit.reason);
+      return;
+    }
+    try {
+      await startTryOn({ selfieUri, productUris, zone, mode, quality });
+      // Schedule a local notification timed for when the try-on should
+      // finish. Fire-and-forget — if permission isn't granted, it no-ops.
+      void scheduleTryOnReadyNotification(mode, quality);
+      router.push('/result');
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Could not start try-on.';
+      Alert.alert("Couldn't start try-on", message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <Screen>
       <StepHeader
-        step="Step 4 of 5"
+        step="Step 4 of 4"
         title={isSingle ? 'Add a product' : 'Add your products'}
         subtitle={
           isSingle
@@ -94,10 +127,16 @@ export default function ProductStep() {
 
         <View style={styles.cta}>
           <Button
-            label="Continue"
-            onPress={() => router.push('/quality')}
+            label={submitting ? 'Starting…' : 'Visualize'}
+            onPress={handleVisualize}
             disabled={continueDisabled}
-            trailing={<ArrowRight size={20} color={colors.primaryOn} strokeWidth={2.4} />}
+            trailing={
+              submitting ? (
+                <ActivityIndicator color={colors.primaryOn} size="small" />
+              ) : (
+                <Wand2 size={20} color={colors.primaryOn} strokeWidth={2.2} />
+              )
+            }
           />
         </View>
       </ScrollView>

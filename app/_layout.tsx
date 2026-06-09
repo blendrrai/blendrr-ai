@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LookProvider } from '../lib/state';
 import { colors } from '../lib/theme';
 import { ensureUserProvisioned, refreshUser } from '../lib/user';
+import { AchievementUnlockModal } from '../components/AchievementUnlockModal';
 
 export default function RootLayout() {
   // Provision an anonymous user (server-side) on first mount. Fires once; the
@@ -50,6 +51,10 @@ export default function RootLayout() {
               gestureEnabled: true,
             }}
           />
+          {/* Mounted at root so achievement unlocks float above any screen.
+              Subscribes to the unlock broadcast in lib/glow.ts and queues
+              celebrations sequentially. */}
+          <AchievementUnlockModal />
         </LookProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

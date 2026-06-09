@@ -50,7 +50,7 @@ export default function ModeStep() {
   return (
     <Screen>
       <StepHeader
-        step="Step 2 of 5"
+        step="Step 2 of 4"
         title="How much are you trying on?"
         subtitle="One product, or a whole look?"
         showHomeButton

@@ -193,7 +193,12 @@ export default function Credits() {
     <Screen>
       <StepHeader title="Credits" subtitle="Your plan, credit balance, and packs." />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={[styles.heroCard, isPro && styles.heroCardPro, shadow.card]}>
           <View style={styles.heroHeader}>
             <View style={[styles.heroIcon, isPro && styles.heroIconPro]}>
@@ -281,8 +286,8 @@ export default function Credits() {
           </View>
           <Text style={styles.sectionHelper}>
             Most AI features (quizzes, ingredient scans, single-product try-ons) cost 1 credit.
-            Try-ons can cost 1–3 credits depending on your selections: +1 for a full-face look
-            (multiple products), +1 for Ultra HD quality. Pro members get {PRO_CREDITS_PER_MONTH} credits a month.
+            Full-face multi-product try-ons cost 2 credits. Every try-on is rendered at our
+            highest quality. Pro members get {PRO_CREDITS_PER_MONTH} credits a month.
           </Text>
         </View>
 

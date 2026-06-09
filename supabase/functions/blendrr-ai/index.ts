@@ -26,13 +26,12 @@ const OPENAI_IMAGE_MODEL = 'gpt-image-1';
 // To revert, restore the PREVIOUS values noted on each line.
 // ============================================================================
 
-// History: was routed dynamically ('medium' for standard, 'high' for ultra),
-// then collapsed to 'low' on 2026-05-22 for cost/speed, then bumped to
-// 'medium' on 2026-05-23 because 'low' results were too noticeably softer
-// at iPhone display resolution. Medium hits the sweet spot — visibly
-// sharper than low while staying cheap (~£0.05/try-on vs ~£0.02) and
-// reasonably fast (~25s vs ~15s).
-const IMAGE_QUALITY: 'low' | 'medium' | 'high' = 'medium';
+// History: dynamic ('medium'/'high') → 'low' (2026-05-22) → 'medium'
+// (2026-05-23) → 'high' (2026-05-23, current). User decision to always
+// ship Ultra HD — no quality choice in the UI anymore. ~£0.13/try-on,
+// ~50s generation, sharpest result. The client also no longer offers a
+// quality picker; everything goes through this path.
+const IMAGE_QUALITY: 'low' | 'medium' | 'high' = 'high';
 
 // DISABLED 2026-05-22: OpenAI's /v1/images/edits silently ignored stream=true
 // (returned application/json instead of text/event-stream), so no partial
@@ -1008,16 +1007,12 @@ serve(async (req) => {
 
     if (userError || !user) return json({ error: 'User not found' }, 401);
 
-    // Variable credit cost. Try-on combines two modifiers:
-    //   base                                = 1 credit
-    //   + 1 if multi mode (full-face look)  = 2 credits
-    //   + 1 if ultra quality                = 3 credits max
-    // Non try-on tasks always cost 1 credit. Free tasks above already returned.
+    // Credit cost — Ultra HD is now the only quality tier (no choice screen),
+    // so the previous "+1 if ultra" modifier is gone. Try-on is 1 credit for
+    // a single product, 2 for a full-face multi-product look. All other
+    // credited tasks (quizzes, scans) are 1 credit flat.
     let creditCost = 1;
-    if (task === 'try-on') {
-      if (payload?.mode === 'multi') creditCost += 1;
-      if (payload?.quality === 'ultra') creditCost += 1;
-    }
+    if (task === 'try-on' && payload?.mode === 'multi') creditCost += 1;
 
     if (user.credits < creditCost) {
       return json({ error: 'Out of credits', credits: user.credits, required: creditCost }, 402);
