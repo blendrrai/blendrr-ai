@@ -35,9 +35,9 @@ const PRO_PRICES: Record<Currency, string> = {
 const FREE_INITIAL_USES = 5;
 
 const PRO_FEATURES = [
-  'Unlimited try-ons in Ultra HD',
-  'All routine quizzes (skin, hair, acne, fragrance)',
-  'Unlimited ingredient scans',
+  '30 AI uses every month',
+  'Spend on try-ons, quizzes, or ingredient scans',
+  'Ultra HD quality on every generation',
   'Glow Score, streak & wishlist — always free',
   'All future features included',
 ];
@@ -104,7 +104,7 @@ export default function Credits() {
   const upgrade = () => {
     Alert.alert(
       `BLENDRR Pro — ${proPrice}/month`,
-      'Unlimited try-ons, quizzes, and ingredient scans. Auto-renews monthly. Cancel anytime. Billing flow wires up next via RevenueCat.',
+      '30 AI uses every month — spend them on try-ons, quizzes, or ingredient scans. Ultra HD quality throughout. Auto-renews monthly. Cancel anytime. Billing flow wires up next via RevenueCat.',
       [
         { text: 'Not now', style: 'cancel' },
         {
@@ -251,8 +251,8 @@ export default function Credits() {
             </View>
             <Text style={styles.sectionHelper}>
               New users get {FREE_INITIAL_USES} free AI uses — spend them on any combination of
-              try-ons, quizzes, or ingredient scans. After that, BLENDRR Pro unlocks unlimited
-              everything. Glow Score, daily streak, achievements and wishlist stay free forever.
+              try-ons, quizzes, or ingredient scans. BLENDRR Pro gives you 30 AI uses every month
+              instead. Glow Score, daily streak, achievements and wishlist stay free forever.
             </Text>
           </View>
         )}

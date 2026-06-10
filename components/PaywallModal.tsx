@@ -17,9 +17,9 @@ import { LEGAL_URLS } from '../lib/legal';
 
 const PRO_PRICE = '£9.99';
 const PRO_FEATURES = [
-  'Unlimited try-ons in Ultra HD',
-  'All routine quizzes (skin, hair, fragrance, acne)',
-  'Unlimited ingredient scans',
+  '30 AI uses every month',
+  'Spend on try-ons, quizzes, or ingredient scans',
+  'Ultra HD quality on every generation',
   'Daily Glow Score + streak (stays free)',
   'All future features included',
 ];
@@ -85,8 +85,8 @@ export function PaywallModal() {
             <Text style={styles.eyebrow}>YOU'VE USED YOUR FREE TRIES</Text>
             <Text style={styles.title}>Go Pro to keep going</Text>
             <Text style={styles.subtitle}>
-              Your 5 free AI uses are up. Unlock unlimited try-ons, quizzes, and scans with
-              BLENDRR Pro.
+              Your 5 free AI uses are up. BLENDRR Pro gives you 30 AI uses every month — spend them
+              on try-ons, quizzes, or ingredient scans.
             </Text>
 
             <View style={styles.priceCard}>
@@ -100,7 +100,7 @@ export function PaywallModal() {
                 </View>
                 <View style={styles.recommendedPill}>
                   <Sparkles size={11} color={colors.primaryOn} strokeWidth={2.4} />
-                  <Text style={styles.recommendedText}>UNLIMITED</Text>
+                  <Text style={styles.recommendedText}>30 / MONTH</Text>
                 </View>
               </View>
 
