@@ -720,7 +720,7 @@ Match the new shoes exactly to Image 2 — same colour, material, shape, style, 
 
 Keep the person identical to Image 1 — same face, body, legs, feet, ankles, skin tone, hair, clothing, posture, and stance. Do not change the body or any clothing other than the shoes. If the new shoes are a different height to the originals (e.g. heels replacing flats), do not adjust the person's height, leg length, posture, or stance to compensate.
 
-Keep the room and background identical to Image 1 — same floor, walls, furniture, lighting, shadows, and every other detail of the environment. Do not change the setting.
+Keep the room, background, and camera identical to Image 1 — same floor, walls, furniture, lighting, shadows, aspect ratio, camera angle, and camera position. Do not change the setting, do not zoom in or out, and do not re-frame or re-crop the shot.
 
 The result should look like a real photo of the same person, in the same place, now wearing the shoes from Image 2.`;
 
@@ -731,7 +731,7 @@ Match the jewelry exactly to Image 2 — same metal, stones, beads, shape, lengt
 
 Keep the person identical to Image 1 — same face, body shape, skin tone, hair, clothing, hands, and proportions. Do not change the body, the clothing, or anything else about the person.
 
-Keep the room and background identical to Image 1 — same walls, furniture, lighting, shadows, and every other detail of the environment. Do not change the setting.
+Keep the room, background, and camera identical to Image 1 — same walls, furniture, floor, lighting, shadows, aspect ratio, camera angle, and camera position. Do not change the setting, do not zoom in or out, and do not re-frame or re-crop the shot.
 
 Do not remove any existing jewelry unless it directly conflicts with the new piece (e.g. swapping one necklace for another).
 
@@ -744,7 +744,7 @@ Match the accessory exactly to Image 2 — same colour, material, shape, size, a
 
 Keep the person identical to Image 1 — same face, body shape, skin tone, hair, clothing, hands, and proportions. Do not change the body, the clothing, or anything else about the person.
 
-Keep the room and background identical to Image 1 — same walls, furniture, lighting, shadows, and every other detail of the environment. Do not change the setting.
+Keep the room, background, and camera identical to Image 1 — same walls, furniture, floor, lighting, shadows, aspect ratio, camera angle, and camera position. Do not change the setting, do not zoom in or out, and do not re-frame or re-crop the shot.
 
 If it's sunglasses, the eyes underneath stay identical — the lenses just sit over them. If it's a hat, the existing hair stays the same and tucks under or around the hat naturally.
 
