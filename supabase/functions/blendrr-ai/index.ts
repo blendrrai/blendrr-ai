@@ -719,7 +719,9 @@ function buildClothingTryOnPrompt(zone: ClothingZone): string {
 
 Match the new top exactly to Image 2 — same colour, pattern, fabric, cut, length, neckline, and sleeve style. Do not change the design, style, or fit of the garment in any way.
 
-Keep the person identical to Image 1 — same face, body shape, build, skin tone, hair, pose, and proportions. Do not slim, reshape, tone, smooth, or modify the body in any way.
+THE FACE MUST STAY PIXEL-IDENTICAL to Image 1 — the same eyes, eyebrows, eyelashes, nose, lips, mouth, jawline, chin, ears, hairline, freckles, makeup, expression, and skin texture. Do NOT retouch, smooth, slim, beautify, age, de-age, or modify ANY facial feature in any way. The person in the output must be unmistakably the same person as in Image 1 — any face change is a failed result.
+
+Keep the rest of the person identical to Image 1 — same face, body shape, build, skin tone, hair, pose, and proportions. Do not slim, reshape, tone, smooth, or modify the body in any way.
 
 Keep the room, background, and camera identical to Image 1 — same walls, furniture, floor, lighting, shadows, aspect ratio, camera angle, and camera position. Do not change the setting, do not zoom in or out, and do not re-frame or re-crop the shot.
 
@@ -732,7 +734,9 @@ The result should look like a real photo of the same person, in the same place, 
 
 Match the new bottoms exactly to Image 2 — same colour, pattern, fabric, cut, length, waistband, and silhouette. Do not change the design, style, or fit of the garment in any way.
 
-Keep the person identical to Image 1 — same face, body shape, build, skin tone, hair, legs, pose, and proportions. Do not slim, tone, reshape, smooth, or modify the body in any way.
+THE FACE MUST STAY PIXEL-IDENTICAL to Image 1 — the same eyes, eyebrows, eyelashes, nose, lips, mouth, jawline, chin, ears, hairline, freckles, makeup, expression, and skin texture. Do NOT retouch, smooth, slim, beautify, age, de-age, or modify ANY facial feature in any way. The person in the output must be unmistakably the same person as in Image 1 — any face change is a failed result.
+
+Keep the rest of the person identical to Image 1 — same face, body shape, build, skin tone, hair, legs, pose, and proportions. Do not slim, tone, reshape, smooth, or modify the body in any way.
 
 Keep the room, background, and camera identical to Image 1 — same walls, furniture, floor, lighting, shadows, aspect ratio, camera angle, and camera position. Do not change the setting, do not zoom in or out, and do not re-frame or re-crop the shot.
 
@@ -745,7 +749,9 @@ The result should look like a real photo of the same person, in the same place, 
 
 Match the new garment exactly to Image 2 — same colour, pattern, fabric, cut, length, neckline, hemline, sleeve length, and silhouette. Do not change the design, style, or fit of the garment in any way.
 
-Keep the person identical to Image 1 — same face, body shape, build, skin tone, hair, pose, and proportions. The garment must adapt to the person's real body — do not slim, tone, lengthen, reshape, or model-ify the body to fit the outfit.
+THE FACE MUST STAY PIXEL-IDENTICAL to Image 1 — the same eyes, eyebrows, eyelashes, nose, lips, mouth, jawline, chin, ears, hairline, freckles, makeup, expression, and skin texture. Do NOT retouch, smooth, slim, beautify, age, de-age, or modify ANY facial feature in any way. The person in the output must be unmistakably the same person as in Image 1 — any face change is a failed result.
+
+Keep the rest of the person identical to Image 1 — same face, body shape, build, skin tone, hair, pose, and proportions. The garment must adapt to the person's real body — do not slim, tone, lengthen, reshape, or model-ify the body to fit the outfit.
 
 Keep the room, background, and camera identical to Image 1 — same walls, furniture, floor, lighting, shadows, aspect ratio, camera angle, and camera position. Do not change the setting, do not zoom in or out, and do not re-frame or re-crop the shot.
 
@@ -758,7 +764,9 @@ The result should look like a real photo of the same person, in the same place, 
 
 Match the new shoes exactly to Image 2 — same colour, material, shape, style, height, and design details. Do not change the design, style, or fit of the shoes in any way.
 
-Keep the person identical to Image 1 — same face, body, legs, feet, ankles, skin tone, hair, clothing, posture, and stance. Do not change the body or any clothing other than the shoes. If the new shoes are a different height to the originals (e.g. heels replacing flats), do not adjust the person's height, leg length, posture, or stance to compensate.
+THE FACE MUST STAY PIXEL-IDENTICAL to Image 1 — the same eyes, eyebrows, eyelashes, nose, lips, mouth, jawline, chin, ears, hairline, freckles, makeup, expression, and skin texture. Do NOT retouch, smooth, slim, beautify, age, de-age, or modify ANY facial feature in any way. The person in the output must be unmistakably the same person as in Image 1 — any face change is a failed result.
+
+Keep the rest of the person identical to Image 1 — same face, body, legs, feet, ankles, skin tone, hair, clothing, posture, and stance. Do not change the body or any clothing other than the shoes. If the new shoes are a different height to the originals (e.g. heels replacing flats), do not adjust the person's height, leg length, posture, or stance to compensate.
 
 Keep the room, background, and camera identical to Image 1 — same floor, walls, furniture, lighting, shadows, aspect ratio, camera angle, and camera position. Do not change the setting, do not zoom in or out, and do not re-frame or re-crop the shot.
 
@@ -769,7 +777,9 @@ The result should look like a real photo of the same person, in the same place, 
 
 Match the jewelry exactly to Image 2 — same metal, stones, beads, shape, length, and design details. Do not change the design or style of the piece in any way.
 
-Keep the person identical to Image 1 — same face, body shape, skin tone, hair, clothing, hands, and proportions. Do not change the body, the clothing, or anything else about the person.
+THE FACE MUST STAY PIXEL-IDENTICAL to Image 1 — the same eyes, eyebrows, eyelashes, nose, lips, mouth, jawline, chin, ears, hairline, freckles, makeup, expression, and skin texture. Do NOT retouch, smooth, slim, beautify, age, de-age, or modify ANY facial feature in any way. The person in the output must be unmistakably the same person as in Image 1 — any face change is a failed result.
+
+Keep the rest of the person identical to Image 1 — same face, body shape, skin tone, hair, clothing, hands, and proportions. Do not change the body, the clothing, or anything else about the person.
 
 Keep the room, background, and camera identical to Image 1 — same walls, furniture, floor, lighting, shadows, aspect ratio, camera angle, and camera position. Do not change the setting, do not zoom in or out, and do not re-frame or re-crop the shot.
 
@@ -782,7 +792,9 @@ The result should look like a real photo of the same person, in the same place, 
 
 Match the accessory exactly to Image 2 — same colour, material, shape, size, and design details. Do not change the design or style of the item in any way.
 
-Keep the person identical to Image 1 — same face, body shape, skin tone, hair, clothing, hands, and proportions. Do not change the body, the clothing, or anything else about the person.
+THE FACE MUST STAY PIXEL-IDENTICAL to Image 1 — the same eyes, eyebrows, eyelashes, nose, lips, mouth, jawline, chin, ears, hairline, freckles, makeup, expression, and skin texture. Do NOT retouch, smooth, slim, beautify, age, de-age, or modify ANY facial feature in any way. The person in the output must be unmistakably the same person as in Image 1 — any face change is a failed result.
+
+Keep the rest of the person identical to Image 1 — same face, body shape, skin tone, hair, clothing, hands, and proportions. Do not change the body, the clothing, or anything else about the person.
 
 Keep the room, background, and camera identical to Image 1 — same walls, furniture, floor, lighting, shadows, aspect ratio, camera angle, and camera position. Do not change the setting, do not zoom in or out, and do not re-frame or re-crop the shot.
 
