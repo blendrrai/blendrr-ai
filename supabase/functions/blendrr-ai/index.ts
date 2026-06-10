@@ -20,6 +20,11 @@ const TEXT_MODEL = 'gemini-2.5-flash';
 // accounts and the Gemini fallback drifted from our prompt format. One
 // model, predictable behaviour, easier to debug.
 const OPENAI_IMAGE_MODEL = 'gpt-image-1';
+// Clothing try-ons go through Gemini 2.5 Flash Image ("Nano Banana") instead
+// of OpenAI. Gemini handles garment-on-body edits noticeably better at a
+// fraction of the cost (~£0.04/call vs ~£0.13) and ~5x the speed. Beauty
+// stays on OpenAI — gpt-image-1 is better at lipstick / foundation finishes.
+const GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image';
 
 // ============================================================================
 // IMAGE GENERATION CONFIG (2026-05-22)
@@ -249,6 +254,36 @@ async function callOpenAIImageEdit(opts: {
 
   if (!finalB64) throw new Error('OpenAI streaming returned no final image');
   return finalB64;
+}
+
+/**
+ * Call Gemini 2.5 Flash Image with one or more reference images and an
+ * edit instruction. Returns base64-encoded PNG/JPEG of the edited image.
+ *
+ * Same convention as the OpenAI helper: the first image is the canvas, the
+ * second onwards are references. Used only for the clothing try-on path —
+ * beauty try-ons stay on OpenAI gpt-image-1.
+ */
+async function callGeminiImageEdit(opts: {
+  prompt: string;
+  images: { data: string; mime?: string }[];
+}): Promise<string> {
+  const parts = await callGemini(GEMINI_IMAGE_MODEL, {
+    contents: [{
+      parts: [
+        { text: opts.prompt },
+        ...opts.images.map((img) => ({
+          inlineData: { mimeType: img.mime ?? 'image/jpeg', data: img.data },
+        })),
+      ],
+    }],
+  });
+  const imagePart = parts.find((p) => p.inlineData);
+  if (!imagePart?.inlineData) {
+    const text = extractText(parts).slice(0, 240);
+    throw new Error(`Gemini returned no image. Response text: ${text || '(empty)'}`);
+  }
+  return imagePart.inlineData.data;
 }
 
 // ============================================================================
@@ -627,26 +662,59 @@ Ultra realistic beauty campaign / iPhone selfie realism. No glam filters, no AI 
 type ClothingZone = 'top' | 'bottom' | 'dress' | 'shoes' | 'jewelry' | 'accessory';
 
 /**
- * Per-zone clothing try-on prompts — deliberately short and conversational.
+ * Per-zone clothing try-on prompts — tuned for Gemini 2.5 Flash Image.
  *
- * Why short: gpt-image-1 has strong identity-preservation defaults baked
- * into the model. Long preservation-heavy prompts can actually backfire by
- * over-anchoring the model's attention on the body/face — it starts
- * "thinking about" those features and unintentionally modifies them.
- * Plain first-person framing ("Show me ... on me") leans on the model's
- * built-in defaults instead.
- *
- * If specific drift modes show up in testing (e.g. always slimming hips on
- * bottom swaps), add one targeted bullet to that zone's prompt only.
+ * Gemini Image responds best to:
+ *   - Natural conversational tone (not rigid bullet lists)
+ *   - "Image 1 / Image 2" reference labels (its native convention)
+ *   - "Take X from Image 1 and..." scene-setting openers
+ *   - ONE preservation sentence, not exhaustive negation lists
+ *   - Anatomy named specifically where it matters
+ *   - "Real photo" framing in the close — pushes away from AI sheen
  */
 function buildClothingTryOnPrompt(zone: ClothingZone): string {
   switch (zone) {
-    case 'top':       return 'Show me this top on me.';
-    case 'bottom':    return 'Show me these bottoms on me.';
-    case 'dress':     return 'Show me this outfit on me.';
-    case 'shoes':     return 'Show me these shoes on me.';
-    case 'jewelry':   return 'Show me this jewelry on me.';
-    case 'accessory': return 'Show me this accessory on me.';
+    case 'top':
+      return `Take the person from Image 1 and dress them in the top shown in Image 2.
+
+Replace only the upper-body clothing. Keep the person's face, body shape, hair, pose, skin tone, background, and lighting exactly the same as Image 1. The new top should drape naturally over their existing torso with realistic fabric folds, shadows, and fit. If the new top reveals arms or skin that were previously covered, those arms and skin should look the same as in Image 1 — same shape, same skin tone — not redrawn or reshaped.
+
+The result should look like a real photo of the same person now wearing the new top.`;
+
+    case 'bottom':
+      return `Take the person from Image 1 and put them in the bottoms shown in Image 2 (trousers, jeans, shorts, or skirt).
+
+Replace only the lower-body clothing. Keep the person's face, body shape, hair, pose, skin tone, background, and lighting exactly the same as Image 1. The new bottoms should fit naturally on their existing waist, hips, and legs with realistic drape and fabric behaviour. If the new bottoms are shorter than the originals and reveal more leg, those legs should look the same as in Image 1 — same shape, same skin tone — not slimmed, toned, or redrawn.
+
+The result should look like a real photo of the same person now wearing the new bottoms.`;
+
+    case 'dress':
+      return `Take the person from Image 1 and dress them in the outfit shown in Image 2 (dress, jumpsuit, romper, or co-ord).
+
+Replace the entire outfit — both upper and lower body. Keep the person's face, body shape, hair, pose, skin tone, background, and lighting exactly the same as Image 1. The garment should adapt to the person's REAL body proportions — do not slim, lengthen, or reshape the body to fit the outfit. Body parts not covered by the new garment (e.g. lower legs below a dress hem, arms below short sleeves) should look identical to Image 1.
+
+The result should look like a real photo of the same person now wearing the new outfit.`;
+
+    case 'shoes':
+      return `Take the person from Image 1 and put them in the shoes shown in Image 2.
+
+Replace only the footwear. Keep the person's face, body, legs, feet shape, clothing, posture, hair, background, and lighting exactly the same as Image 1. The shoes should sit naturally on the existing feet with realistic shadows and ground contact. If the new shoes are a different height to the originals (heels replacing flats, for example), do not change the person's height, leg length, posture, or stance to compensate.
+
+The result should look like a real photo of the same person now wearing the new shoes.`;
+
+    case 'jewelry':
+      return `Take the person from Image 1 and add the jewelry shown in Image 2 to the appropriate body part.
+
+Place the jewelry where its type naturally goes: a necklace on the chest or collarbones, earrings on the ears, a bracelet on a wrist, a ring on a finger, an anklet on an ankle. Render the metal, beads, or stones with realistic shine and reflections that match the lighting in Image 1. Keep the person's face, body, hair, clothing, skin tone, background, and lighting exactly the same as Image 1. Do not remove any existing jewelry unless the new piece directly conflicts (e.g. swapping one necklace for another).
+
+The result should look like a real photo of the same person now wearing the new jewelry.`;
+
+    case 'accessory':
+      return `Take the person from Image 1 and add the accessory shown in Image 2 to the appropriate part of the body.
+
+Place the accessory where its type naturally goes: a bag in a hand or on a shoulder, a hat on top of the head over the existing hair, a scarf around the neck, sunglasses over the eyes, a belt around the waistband of the bottoms, a headband in the hair, gloves on the hands. Keep the person's face, body, hair, clothing, skin tone, background, and lighting exactly the same as Image 1. If it's sunglasses, the eyes underneath stay identical — the lenses just sit over them. If it's a hat, the existing hair stays the same and tucks under or around the hat naturally.
+
+The result should look like a real photo of the same person now wearing the new accessory.`;
   }
 }
 
@@ -696,35 +764,41 @@ async function handleTryOn(payload: {
     shade.hex = shade.hex.startsWith('#') ? shade.hex : `#${shade.hex}`;
   }
 
-  // Step 2: generate try-on image via OpenAI gpt-image-1. Prompt family
-  // picked based on category — beauty uses the shade-based makeup prompts,
-  // clothing uses a body-preservation-first garment prompt keyed to the
-  // selected clothing region.
-  let openAIPrompt: string;
-  if (category === 'clothing') {
-    const cz: ClothingZone = payload.clothingZone ?? 'top';
-    openAIPrompt = buildClothingTryOnPrompt(cz);
-  } else if (mode === 'single' && shade) {
-    openAIPrompt = buildTryOnPrompt(payload.zone, shade.hex, shade.description, shade.finish);
-  } else {
-    openAIPrompt = buildMultiTryOnPrompt(productImages.length);
-  }
-
-  const openAIImages = [
+  // Step 2: generate try-on image.
+  //   Beauty   → OpenAI gpt-image-1 (better at lipstick / foundation finishes,
+  //              and integrates with the shade-extraction pre-step).
+  //   Clothing → Gemini 2.5 Flash Image (better garment-on-body editing,
+  //              ~3x cheaper, ~5x faster, and no skin-tone drift issues we've
+  //              seen on gpt-image-1 for clothing).
+  const images = [
     { data: payload.selfieImage, mime: 'image/jpeg' },
     ...productImages.map((data) => ({ data, mime: 'image/jpeg' })),
   ];
 
-  console.log(`[try-on] openai ${OPENAI_IMAGE_MODEL} (${openAIQuality}, mode=${mode}, products=${productImages.length}, stream=${ENABLE_STREAMING})`);
-  const imageBase64 = await callOpenAIImageEdit({
-    model: OPENAI_IMAGE_MODEL,
-    prompt: openAIPrompt,
-    quality: openAIQuality,
-    images: openAIImages,
-    stream: ENABLE_STREAMING,
-    partialImages: PARTIAL_IMAGES_COUNT,
-    onPartial,
-  });
+  let imageBase64: string;
+  if (category === 'clothing') {
+    const cz: ClothingZone = payload.clothingZone ?? 'top';
+    const geminiPrompt = buildClothingTryOnPrompt(cz);
+    console.log(`[try-on] gemini ${GEMINI_IMAGE_MODEL} (clothing, zone=${cz}, products=${productImages.length})`);
+    imageBase64 = await callGeminiImageEdit({
+      prompt: geminiPrompt,
+      images,
+    });
+  } else {
+    const openAIPrompt = mode === 'single' && shade
+      ? buildTryOnPrompt(payload.zone, shade.hex, shade.description, shade.finish)
+      : buildMultiTryOnPrompt(productImages.length);
+    console.log(`[try-on] openai ${OPENAI_IMAGE_MODEL} (${openAIQuality}, mode=${mode}, products=${productImages.length}, stream=${ENABLE_STREAMING})`);
+    imageBase64 = await callOpenAIImageEdit({
+      model: OPENAI_IMAGE_MODEL,
+      prompt: openAIPrompt,
+      quality: openAIQuality,
+      images,
+      stream: ENABLE_STREAMING,
+      partialImages: PARTIAL_IMAGES_COUNT,
+      onPartial,
+    });
+  }
 
   return {
     imageBase64,
