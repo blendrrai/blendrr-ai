@@ -9,7 +9,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') ?? '';
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? '';
-const FAL_API_KEY = Deno.env.get('FAL_API_KEY') ?? '';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
@@ -21,12 +20,12 @@ const TEXT_MODEL = 'gemini-2.5-flash';
 // accounts and the Gemini fallback drifted from our prompt format. One
 // model, predictable behaviour, easier to debug.
 const OPENAI_IMAGE_MODEL = 'gpt-image-1';
-// Clothing try-ons go through fal.ai's hosted nano-banana-2/edit — a newer,
-// refined variant of Google's Nano Banana with noticeably better instruction-
-// following and structure preservation than the direct Gemini 2.5 Flash Image
-// endpoint. Same model TradeShot uses. Slower (~15-25s vs ~8-12s for direct
-// Gemini) but consistently sharper output. Beauty stays on OpenAI gpt-image-1.
-const FAL_NANO_BANANA_URL = 'https://fal.run/fal-ai/nano-banana-2/edit';
+// Clothing try-ons go through Google's Gemini 2.5 Flash Image direct. This
+// is Google's flagship image-edit model — same underlying model as fal.ai's
+// "nano-banana-2/edit" (which is just a hosted wrapper). Direct keeps the
+// dependency surface small: same vendor as our text/vision Gemini calls,
+// same API key, no extra service to set up. Beauty stays on OpenAI gpt-image-1.
+const GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image';
 
 // ============================================================================
 // IMAGE GENERATION CONFIG (2026-05-22)
@@ -259,72 +258,36 @@ async function callOpenAIImageEdit(opts: {
 }
 
 /**
- * Call fal.ai's nano-banana-2/edit endpoint with one or more reference
- * images and an edit instruction. Returns base64-encoded JPEG of the
- * edited image.
+ * Call Gemini 2.5 Flash Image with one or more reference images and an
+ * edit instruction. Returns base64-encoded PNG/JPEG of the edited image.
  *
  * Same convention as the OpenAI helper: the first image is the canvas, the
  * second onwards are references. Used only for the clothing try-on path —
  * beauty try-ons stay on OpenAI gpt-image-1.
  *
- * fal.ai accepts either public URLs or data: URIs in image_urls — we send
- * data URIs so we don't need a transient hosting step. The response is a
- * CDN URL to the generated image; we fetch it and base64-encode so the
- * caller doesn't need to change shape.
+ * Uses the existing callGemini wrapper so we get retry / error handling
+ * for free, then digs the inline image part out of the response.
  */
-async function callFalNanoBanana(opts: {
+async function callGeminiImageEdit(opts: {
   prompt: string;
   images: { data: string; mime?: string }[];
 }): Promise<string> {
-  if (!FAL_API_KEY) throw new Error('FAL_API_KEY not configured');
-
-  const imageUrls = opts.images.map((img) => {
-    const mime = img.mime ?? 'image/jpeg';
-    return `data:${mime};base64,${img.data}`;
+  const parts = await callGemini(GEMINI_IMAGE_MODEL, {
+    contents: [{
+      parts: [
+        { text: opts.prompt },
+        ...opts.images.map((img) => ({
+          inlineData: { mimeType: img.mime ?? 'image/jpeg', data: img.data },
+        })),
+      ],
+    }],
   });
-
-  const res = await fetch(FAL_NANO_BANANA_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Key ${FAL_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      prompt: opts.prompt,
-      image_urls: imageUrls,
-      num_images: 1,
-      output_format: 'jpeg',
-    }),
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`fal.ai ${res.status}: ${errorText.slice(0, 240)}`);
+  const imagePart = parts.find((p) => p.inlineData);
+  if (!imagePart?.inlineData) {
+    const text = extractText(parts).slice(0, 240);
+    throw new Error(`Gemini returned no image. Response text: ${text || '(empty)'}`);
   }
-
-  const data = await res.json();
-  const generatedImageUrl: string | undefined = data?.images?.[0]?.url;
-  if (!generatedImageUrl) {
-    throw new Error(`fal.ai returned no image. Response: ${JSON.stringify(data).slice(0, 200)}`);
-  }
-
-  // Pull the CDN image and base64-encode so the result fits the same
-  // result_image_base64 column the OpenAI path writes to.
-  const imageRes = await fetch(generatedImageUrl);
-  if (!imageRes.ok) {
-    throw new Error(`Failed to fetch generated image: HTTP ${imageRes.status}`);
-  }
-  const bytes = new Uint8Array(await imageRes.arrayBuffer());
-  let binary = '';
-  // String.fromCharCode + apply has a stack limit on Deno; chunk to be safe.
-  const CHUNK = 0x8000;
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCharCode.apply(
-      null,
-      bytes.subarray(i, i + CHUNK) as unknown as number[],
-    );
-  }
-  return btoa(binary);
+  return imagePart.inlineData.data;
 }
 
 // ============================================================================
@@ -854,8 +817,8 @@ async function handleTryOn(payload: {
   if (category === 'clothing') {
     const cz: ClothingZone = payload.clothingZone ?? 'top';
     const clothingPrompt = buildClothingTryOnPrompt(cz);
-    console.log(`[try-on] fal nano-banana-2 (clothing, zone=${cz}, products=${productImages.length})`);
-    imageBase64 = await callFalNanoBanana({
+    console.log(`[try-on] gemini ${GEMINI_IMAGE_MODEL} (clothing, zone=${cz}, products=${productImages.length})`);
+    imageBase64 = await callGeminiImageEdit({
       prompt: clothingPrompt,
       images,
     });
