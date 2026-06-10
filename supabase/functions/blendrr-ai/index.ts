@@ -20,12 +20,12 @@ const TEXT_MODEL = 'gemini-2.5-flash';
 // accounts and the Gemini fallback drifted from our prompt format. One
 // model, predictable behaviour, easier to debug.
 const OPENAI_IMAGE_MODEL = 'gpt-image-1';
-// Clothing try-ons go through Google's Gemini 2.5 Flash Image direct. This
-// is Google's flagship image-edit model — same underlying model as fal.ai's
-// "nano-banana-2/edit" (which is just a hosted wrapper). Direct keeps the
-// dependency surface small: same vendor as our text/vision Gemini calls,
-// same API key, no extra service to set up. Beauty stays on OpenAI gpt-image-1.
-const GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image';
+// Clothing try-ons go through Google's image-edit Gemini direct. Testing
+// gemini-3-pro-image-preview — Google's preview Pro-tier image model.
+// Fall back to 'gemini-2.5-flash-image' (the previously GA Nano Banana) if
+// this returns a model-not-found error on first deploy. Beauty stays on
+// OpenAI gpt-image-1.
+const GEMINI_IMAGE_MODEL = 'gemini-3-pro-image-preview';
 
 // ============================================================================
 // IMAGE GENERATION CONFIG (2026-05-22)
