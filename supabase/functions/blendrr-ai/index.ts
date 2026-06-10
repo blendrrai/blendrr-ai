@@ -681,7 +681,7 @@ Match the new top exactly to Image 2 — same colour, pattern, fabric, cut, leng
 
 Keep the person identical to Image 1 — same face, body shape, build, skin tone, hair, pose, and proportions. Do not slim, reshape, tone, smooth, or modify the body in any way.
 
-Keep the room and background identical to Image 1 — same walls, furniture, floor, lighting, shadows, and every other detail of the environment. Do not change the setting.
+Keep the room, background, and camera identical to Image 1 — same walls, furniture, floor, lighting, shadows, aspect ratio, camera angle, and camera position. Do not change the setting, do not zoom in or out, and do not re-frame or re-crop the shot.
 
 If the new top reveals arms or skin that were previously covered, those arms and skin look the same as in Image 1 — same shape, same skin tone — not redrawn.
 
@@ -694,7 +694,7 @@ Match the new bottoms exactly to Image 2 — same colour, pattern, fabric, cut, 
 
 Keep the person identical to Image 1 — same face, body shape, build, skin tone, hair, legs, pose, and proportions. Do not slim, tone, reshape, smooth, or modify the body in any way.
 
-Keep the room and background identical to Image 1 — same walls, furniture, floor, lighting, shadows, and every other detail of the environment. Do not change the setting.
+Keep the room, background, and camera identical to Image 1 — same walls, furniture, floor, lighting, shadows, aspect ratio, camera angle, and camera position. Do not change the setting, do not zoom in or out, and do not re-frame or re-crop the shot.
 
 If the new bottoms are shorter than the originals, the newly visible legs stay identical to Image 1 — same shape, same skin tone — not redrawn or slimmed.
 
@@ -707,7 +707,7 @@ Match the new garment exactly to Image 2 — same colour, pattern, fabric, cut, 
 
 Keep the person identical to Image 1 — same face, body shape, build, skin tone, hair, pose, and proportions. The garment must adapt to the person's real body — do not slim, tone, lengthen, reshape, or model-ify the body to fit the outfit.
 
-Keep the room and background identical to Image 1 — same walls, furniture, floor, lighting, shadows, and every other detail of the environment. Do not change the setting.
+Keep the room, background, and camera identical to Image 1 — same walls, furniture, floor, lighting, shadows, aspect ratio, camera angle, and camera position. Do not change the setting, do not zoom in or out, and do not re-frame or re-crop the shot.
 
 Body parts not covered by the new garment (e.g. legs below a dress hem, arms below short sleeves) look identical to Image 1.
 
