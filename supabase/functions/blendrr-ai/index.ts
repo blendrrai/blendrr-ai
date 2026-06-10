@@ -677,44 +677,78 @@ function buildClothingTryOnPrompt(zone: ClothingZone): string {
     case 'top':
       return `Take the person from Image 1 and dress them in the top shown in Image 2.
 
-Replace only the upper-body clothing. Keep the person's face, body shape, hair, pose, skin tone, background, and lighting exactly the same as Image 1. The new top should drape naturally over their existing torso with realistic fabric folds, shadows, and fit. If the new top reveals arms or skin that were previously covered, those arms and skin should look the same as in Image 1 — same shape, same skin tone — not redrawn or reshaped.
+Match the new top exactly to Image 2 — same colour, pattern, fabric, cut, length, neckline, and sleeve style. Do not change the design, style, or fit of the garment in any way.
 
-The result should look like a real photo of the same person now wearing the new top.`;
+Keep the person identical to Image 1 — same face, body shape, build, skin tone, hair, pose, and proportions. Do not slim, reshape, tone, smooth, or modify the body in any way.
+
+Keep the room and background identical to Image 1 — same walls, furniture, floor, lighting, shadows, and every other detail of the environment. Do not change the setting.
+
+If the new top reveals arms or skin that were previously covered, those arms and skin look the same as in Image 1 — same shape, same skin tone — not redrawn.
+
+The result should look like a real photo of the same person, in the same place, now wearing the top from Image 2.`;
 
     case 'bottom':
       return `Take the person from Image 1 and put them in the bottoms shown in Image 2 (trousers, jeans, shorts, or skirt).
 
-Replace only the lower-body clothing. Keep the person's face, body shape, hair, pose, skin tone, background, and lighting exactly the same as Image 1. The new bottoms should fit naturally on their existing waist, hips, and legs with realistic drape and fabric behaviour. If the new bottoms are shorter than the originals and reveal more leg, those legs should look the same as in Image 1 — same shape, same skin tone — not slimmed, toned, or redrawn.
+Match the new bottoms exactly to Image 2 — same colour, pattern, fabric, cut, length, waistband, and silhouette. Do not change the design, style, or fit of the garment in any way.
 
-The result should look like a real photo of the same person now wearing the new bottoms.`;
+Keep the person identical to Image 1 — same face, body shape, build, skin tone, hair, legs, pose, and proportions. Do not slim, tone, reshape, smooth, or modify the body in any way.
+
+Keep the room and background identical to Image 1 — same walls, furniture, floor, lighting, shadows, and every other detail of the environment. Do not change the setting.
+
+If the new bottoms are shorter than the originals, the newly visible legs stay identical to Image 1 — same shape, same skin tone — not redrawn or slimmed.
+
+The result should look like a real photo of the same person, in the same place, now wearing the bottoms from Image 2.`;
 
     case 'dress':
       return `Take the person from Image 1 and dress them in the outfit shown in Image 2 (dress, jumpsuit, romper, or co-ord).
 
-Replace the entire outfit — both upper and lower body. Keep the person's face, body shape, hair, pose, skin tone, background, and lighting exactly the same as Image 1. The garment should adapt to the person's REAL body proportions — do not slim, lengthen, or reshape the body to fit the outfit. Body parts not covered by the new garment (e.g. lower legs below a dress hem, arms below short sleeves) should look identical to Image 1.
+Match the new garment exactly to Image 2 — same colour, pattern, fabric, cut, length, neckline, hemline, sleeve length, and silhouette. Do not change the design, style, or fit of the garment in any way.
 
-The result should look like a real photo of the same person now wearing the new outfit.`;
+Keep the person identical to Image 1 — same face, body shape, build, skin tone, hair, pose, and proportions. The garment must adapt to the person's real body — do not slim, tone, lengthen, reshape, or model-ify the body to fit the outfit.
+
+Keep the room and background identical to Image 1 — same walls, furniture, floor, lighting, shadows, and every other detail of the environment. Do not change the setting.
+
+Body parts not covered by the new garment (e.g. legs below a dress hem, arms below short sleeves) look identical to Image 1.
+
+The result should look like a real photo of the same person, in the same place, now wearing the outfit from Image 2.`;
 
     case 'shoes':
       return `Take the person from Image 1 and put them in the shoes shown in Image 2.
 
-Replace only the footwear. Keep the person's face, body, legs, feet shape, clothing, posture, hair, background, and lighting exactly the same as Image 1. The shoes should sit naturally on the existing feet with realistic shadows and ground contact. If the new shoes are a different height to the originals (heels replacing flats, for example), do not change the person's height, leg length, posture, or stance to compensate.
+Match the new shoes exactly to Image 2 — same colour, material, shape, style, height, and design details. Do not change the design, style, or fit of the shoes in any way.
 
-The result should look like a real photo of the same person now wearing the new shoes.`;
+Keep the person identical to Image 1 — same face, body, legs, feet, ankles, skin tone, hair, clothing, posture, and stance. Do not change the body or any clothing other than the shoes. If the new shoes are a different height to the originals (e.g. heels replacing flats), do not adjust the person's height, leg length, posture, or stance to compensate.
+
+Keep the room and background identical to Image 1 — same floor, walls, furniture, lighting, shadows, and every other detail of the environment. Do not change the setting.
+
+The result should look like a real photo of the same person, in the same place, now wearing the shoes from Image 2.`;
 
     case 'jewelry':
-      return `Take the person from Image 1 and add the jewelry shown in Image 2 to the appropriate body part.
+      return `Take the person from Image 1 and add the jewelry shown in Image 2 to the appropriate body part (necklace on the chest or collarbones, earrings on the ears, bracelet on a wrist, ring on a finger, anklet on an ankle).
 
-Place the jewelry where its type naturally goes: a necklace on the chest or collarbones, earrings on the ears, a bracelet on a wrist, a ring on a finger, an anklet on an ankle. Render the metal, beads, or stones with realistic shine and reflections that match the lighting in Image 1. Keep the person's face, body, hair, clothing, skin tone, background, and lighting exactly the same as Image 1. Do not remove any existing jewelry unless the new piece directly conflicts (e.g. swapping one necklace for another).
+Match the jewelry exactly to Image 2 — same metal, stones, beads, shape, length, and design details. Do not change the design or style of the piece in any way.
 
-The result should look like a real photo of the same person now wearing the new jewelry.`;
+Keep the person identical to Image 1 — same face, body shape, skin tone, hair, clothing, hands, and proportions. Do not change the body, the clothing, or anything else about the person.
+
+Keep the room and background identical to Image 1 — same walls, furniture, lighting, shadows, and every other detail of the environment. Do not change the setting.
+
+Do not remove any existing jewelry unless it directly conflicts with the new piece (e.g. swapping one necklace for another).
+
+The result should look like a real photo of the same person, in the same place, now wearing the jewelry from Image 2.`;
 
     case 'accessory':
-      return `Take the person from Image 1 and add the accessory shown in Image 2 to the appropriate part of the body.
+      return `Take the person from Image 1 and add the accessory shown in Image 2 to the appropriate part of the body (bag in a hand or on a shoulder, hat on the head over the existing hair, scarf around the neck, sunglasses over the eyes, belt at the waistband, headband in the hair, gloves on the hands).
 
-Place the accessory where its type naturally goes: a bag in a hand or on a shoulder, a hat on top of the head over the existing hair, a scarf around the neck, sunglasses over the eyes, a belt around the waistband of the bottoms, a headband in the hair, gloves on the hands. Keep the person's face, body, hair, clothing, skin tone, background, and lighting exactly the same as Image 1. If it's sunglasses, the eyes underneath stay identical — the lenses just sit over them. If it's a hat, the existing hair stays the same and tucks under or around the hat naturally.
+Match the accessory exactly to Image 2 — same colour, material, shape, size, and design details. Do not change the design or style of the item in any way.
 
-The result should look like a real photo of the same person now wearing the new accessory.`;
+Keep the person identical to Image 1 — same face, body shape, skin tone, hair, clothing, hands, and proportions. Do not change the body, the clothing, or anything else about the person.
+
+Keep the room and background identical to Image 1 — same walls, furniture, lighting, shadows, and every other detail of the environment. Do not change the setting.
+
+If it's sunglasses, the eyes underneath stay identical — the lenses just sit over them. If it's a hat, the existing hair stays the same and tucks under or around the hat naturally.
+
+The result should look like a real photo of the same person, in the same place, now wearing the accessory from Image 2.`;
   }
 }
 
