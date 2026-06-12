@@ -409,56 +409,6 @@ type Zone =
   | 'mascara'
   | 'eyebrows'
   | 'hair';
-const FINISH_VISUAL: Record<string, string> = {
-  matte: 'no shine, soft and powdery, completely flat reflectance',
-  satin: 'subtle natural sheen, smooth but not wet',
-  glossy: 'wet, reflective, light-catching, mirror-like highlights',
-  shimmer: 'visible glitter or sparkle particles within the shade',
-  metallic: 'chrome or foil-like, extremely reflective',
-  sheer: 'translucent, low pigment',
-};
-
-async function handleDescribeShade(payload: { productImage: string; zone: string }) {
-  const prompt = `You are a colour-matching specialist for a beauty app. Analyse this image of a cosmetic product (for ${payload.zone}) and return the EXACT hex code of the TRUE makeup shade — the shade as a brand would print it on a colour-block swatch card, NOT how it appears in this specific photo.
-
-PRIORITY ORDER for reading (use the highest available source):
-1. SWATCH BLOCK on white background (brand stock image) — read directly, this IS the true shade
-2. SWATCH on skin/paper — read directly, then mentally brighten ~10% to remove skin undertone bleed
-3. PRODUCT BULLET/PAN visible — read the brightest, most evenly-lit point of the product itself, ignoring shadow side
-4. APPLIED PRODUCT on a model's lips/skin — read from the brightest application area, then brighten by 15-20% to compensate for lip wetness, skin tone, and lighting darkening
-5. PACKAGING ONLY (caps, tubes) — last resort, infer best estimate
-
-CRITICAL accuracy rules:
-- The hex you return represents the shade in PERFECT NEUTRAL LIGHTING. Photo lighting almost always darkens what you see. ERR LIGHTER, NOT DARKER.
-- For nude / pink-toned lipsticks like Pillow Talk Medium, MAC Velvet Teddy, etc — these read as warm pinkish-browns around #B07060 to #C88575. If you find yourself returning anything below #8B5040, you are probably reading shadow, re-sample.
-- For bold reds, full-pigment shades will be saturated (high chroma). If your hex has R, G, B all under 100, you're reading shadow not pigment.
-- For deep berry/wine shades, do read them dark — but again, sample the BRIGHTEST point.
-- DO NOT average across the image. Pick the single brightest, least-shadowed pixel area and read THAT.
-
-IGNORE entirely: tube/bottle/cap material colour, brand labels, background, photo lighting cast, white specular highlights, reflections, watermarks.
-
-Finish definitions:
-- matte: no shine, soft and powdery, completely flat reflectance
-- satin: subtle natural sheen, smooth but not wet
-- glossy: wet, reflective, light-catching, mirror-like highlights
-- shimmer: visible glitter or sparkle particles within the shade
-- metallic: chrome or foil-like, extremely reflective
-- sheer: translucent, low pigment
-
-Return ONLY this JSON, no preamble:
-{ "hex": "#RRGGBB", "description": "max 6 words", "finish": "matte" }`;
-
-  const parts = await callGemini(TEXT_MODEL, {
-    contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: 'image/jpeg', data: payload.productImage } }] }],
-    generationConfig: { responseMimeType: 'application/json', temperature: 0.1 },
-  });
-  const result = extractJson<{ hex: string; description: string; finish: string }>(extractText(parts));
-  // Log the extracted shade so we can diagnose when the result lipstick
-  // colour doesn't match the product (e.g. nude product → orange-red output
-  // = Gemini misread the bullet colour).
-  console.log(`[describe-shade] zone=${payload.zone} hex=${result?.hex} desc="${result?.description}" finish=${result?.finish}`);
-  return result;
-}
 
 /**
  * Build the try-on prompt for the given zone. Structure follows what GPT-Image
@@ -469,12 +419,7 @@ Return ONLY this JSON, no preamble:
  * its own case here with tailored INSTRUCTIONS — the TASK/INPUTS/OUTPUT shell
  * stays the same.
  */
-function buildTryOnPrompt(
-  zone: Zone,
-  hex: string,
-  description: string,
-  finish: string,
-): string {
+function buildTryOnPrompt(zone: Zone): string {
   const header = `You are a professional beauty AI image editor.`;
   const outputStyle = `OUTPUT STYLE:\nUltra realistic beauty campaign / iPhone selfie realism. No glam filters, no AI artifacts, no doll-like skin, no plastic textures. The result should look like a real photo of a real person wearing real makeup.`;
 
@@ -517,9 +462,7 @@ INPUTS:
 
 INSTRUCTIONS:
 - Match the lipstick shade from the reference image as accurately as possible. Read the colour from the lipstick bullet itself (the cylindrical wax/cream), NOT the cap, tube, or packaging.
-- The shade is approximately ${hex} (${description}) — use as a sanity check; trust the product image as the primary colour source.
 - Apply the lipstick with proper opaque coverage — the natural lip colour must be fully covered. The result should clearly look like worn lipstick, not a sheer tint.
-- Maintain a realistic ${finish} finish (matte = flat; satin = subtle sheen; glossy = wet/reflective; shimmer = sparkle particles).
 - Apply ONLY to the lip surface with realistic edges. Do NOT change lip shape, lip line, philtrum, or surrounding skin.
 ${preserveCommon}
 
@@ -537,10 +480,8 @@ INPUTS:
 - 1 foundation product image (the second image — use the swatch or actual cream/liquid colour, NOT the bottle or labels)
 
 INSTRUCTIONS:
-- Match the foundation shade from the reference image. The shade is approximately ${hex} (${description}) — use as a sanity check; trust the product image as primary.
 - Apply foundation across the ENTIRE face — forehead, temples, cheeks, nose, chin, jawline, under-eyes, blending down to the neck. NOT in patches, NOT in stripes, NOT just cheeks.
 - Blend naturally into the skin while preserving pores, freckles, moles, and realistic skin texture. Do NOT over-smooth, retouch, or create doll-like skin.
-- Match the product's finish (${finish}: matte = soft/flat, satin = natural smooth, dewy = subtle glow).
 - Apply ONLY to the SKIN. Do NOT cover the eyes, eyelashes, eyebrows, lips, or hairline.
 ${preserveCommon}
 
@@ -558,11 +499,9 @@ INPUTS:
 - 1 concealer product image (use the actual cream/liquid colour as the reference)
 
 INSTRUCTIONS:
-- Match the concealer shade from the reference image. Approximately ${hex} (${description}) — use as a sanity check; trust the product image.
 - Apply ONLY to the typical concealer areas: under-eyes (covering any dark circles), the sides of the nose if needed, and any visible blemishes or redness on the face.
 - This is TARGETED application — NOT full-face like foundation. Most of the skin should remain untouched.
 - Blend the edges seamlessly so there are no visible patches or borders. The result should look like flawless natural skin, not painted-on coverage.
-- Match the product's ${finish} finish — natural and skin-like, never cakey.
 - Do NOT cover the eyes themselves, eyelashes, eyebrows, lips, or hairline.
 ${preserveCommon}
 
@@ -580,10 +519,8 @@ INPUTS:
 - 1 blush product image (powder pan, cream pot, or stick — use the actual pigment colour)
 
 INSTRUCTIONS:
-- Match the blush shade from the reference image. Approximately ${hex} (${description}) — use as a sanity check; trust the product image.
 - Apply ONLY to the apples of the cheeks (the rounded part that lifts when smiling), with a soft diffused edge blending up toward the temples. Optionally a very light touch on the nose tip for a "flushed" look.
 - This is a SOFT WASH of colour — natural flush, not a painted stripe. The colour should look like the person is naturally a little warmed/flushed.
-- Match the product's finish (${finish}: matte = soft powdery flush, satin = natural healthy glow, dewy/glossy = luminous "lit-from-within" effect).
 - Do NOT extend over the eyes, lips, hairline, jaw, or full cheek area. Stay on the apples only.
 ${preserveCommon}
 
@@ -601,11 +538,9 @@ INPUTS:
 - 1 bronzer product image (powder pan or stick — use the actual pigment colour)
 
 INSTRUCTIONS:
-- Match the bronzer shade from the reference image. Approximately ${hex} (${description}) — use as a sanity check; trust the product image.
 - Apply to the areas where the sun naturally hits: temples and forehead perimeter, top of the cheekbones (NOT the apples), along the jawline, and a subtle stroke down the sides of the nose. Forms a soft "3" shape on each side of the face.
 - This is a SUBTLE warming, not heavy contour. The result should look like a light tan or healthy sun-kissed glow, not painted-on shadow.
 - Soft, diffused, blended edges — no visible lines.
-- Match the product's finish (${finish}: matte for cleaner warmth, shimmer for a glow).
 - Do NOT cover the centre of the face (forehead centre, nose bridge, apples of cheeks, chin) — that stays the natural skin tone for contrast.
 - Do NOT change lips, eyes, brows, or hair.
 ${preserveCommon}
@@ -624,10 +559,8 @@ INPUTS:
 - 1 eyeliner product image (pen tip, gel pot, or pencil — use the actual pigment colour)
 
 INSTRUCTIONS:
-- Match the eyeliner shade from the reference image. Approximately ${hex} (${description}) — use as a sanity check; trust the product image.
 - Apply ONLY along the upper lash line (and optionally a thin line on the lower lash line if it matches the product type). Follow the natural eye shape.
 - The line should be crisp, even, and follow the lash line precisely — no shape distortion, no winged extensions beyond the natural eye contour (unless the product is clearly for that and the result still looks like normal makeup).
-- Apply at the product's typical opacity for ${finish} finish.
 - Do NOT change eye shape, eye size, pupil colour, iris colour, eyelash length, or surrounding skin.
 - Do NOT extend the line beyond the outer corner of the eye in a dramatic wing — keep it natural and subtle unless the prompt clearly suggests a wing.
 ${preserveCommon}
@@ -646,11 +579,9 @@ INPUTS:
 - 1 eyeshadow product image (single pan or palette — use the actual pigment colour)
 
 INSTRUCTIONS:
-- Match the eyeshadow shade from the reference image. Approximately ${hex} (${description}) — use as a sanity check; trust the product image.
 - Apply to the eyelid (lid space from lash line up to the natural crease), with soft blending into the crease and a slight lift toward the outer corner.
 - A subtle touch in the crease and along the lower lash line is fine if it suits the product, but the main concentration is on the lid.
 - This should look like a wearable everyday eyeshadow, not a heavy editorial look — soft, blended, no harsh lines.
-- Match the product's finish (${finish}: matte = soft and flat, shimmer/metallic = catches light, satin = subtle sheen).
 - Do NOT change eye shape, eye size, lash length, brows, or surrounding skin.
 ${preserveCommon}
 
@@ -668,7 +599,6 @@ INPUTS:
 - 1 mascara product image (tube, wand, or swatch — use the pigment colour, usually black or brown)
 
 INSTRUCTIONS:
-- Match the mascara shade from the reference image. Approximately ${hex} (${description}) — use as a sanity check; trust the product image.
 - Apply ONLY to the eyelashes — upper and lower lashes both visible if present in the source.
 - Lashes should look darker, slightly thicker, and slightly longer/more defined — like a single coat of mascara has been applied. NOT extreme false-lash levels.
 - Preserve the natural lash direction and shape. Do NOT add fake-looking spider lashes, clumps, or cartoon thickness.
@@ -690,10 +620,8 @@ INPUTS:
 - 1 brow product image (pencil, pomade, gel, or powder — use the actual pigment colour)
 
 INSTRUCTIONS:
-- Match the brow product shade from the reference image. Approximately ${hex} (${description}) — use as a sanity check; trust the product image.
 - Fill in sparse areas of the existing eyebrows so they look slightly fuller and more defined. Follow the EXISTING brow shape precisely — do NOT change brow position, arch height, length, or thickness beyond gentle filling.
 - The result should look like the person has neatly groomed brows with a little extra colour — not drawn-on cartoon brows.
-- Match the product's finish (${finish}: pencil = soft hair-like strokes, pomade = defined, gel = brushed-up and held).
 - Do NOT change eye shape, lashes, skin tone, or any other facial feature.
 - Do NOT extend the brows beyond their natural start and end points.
 ${preserveCommon}
@@ -713,7 +641,6 @@ INPUTS:
 
 INSTRUCTIONS:
 - Match the hair colour from the reference image as accurately as possible.
-- The shade is approximately ${hex} (${description}) — use as a sanity check; trust the product image.
 - Recolour the hair while preserving natural strand texture, highlights, lowlights, and dimensional colour variation that real hair has. Do NOT make the hair look flat, painted, or like a solid colour block.
 - Do NOT change hair shape, length, parting, fly-aways, or hairline position.
 - Apply ONLY to hair strands. Do NOT change face, skin, eyebrows, eyelashes, or background.
@@ -911,25 +838,17 @@ async function handleTryOn(payload: {
     throw new Error('Multi mode supports up to 5 products.');
   }
 
-  // Step 1 (BEAUTY only): describe shade. Clothing skips this entirely since
-  // we want the AI to read the garment colour, pattern, and texture directly
-  // from the reference image — no hex extraction makes sense for clothing.
-  let shade: { hex: string; description: string; finish: string } | null = null;
-  if (category === 'beauty' && mode === 'single') {
-    try {
-      shade = await handleDescribeShade({ productImage: productImages[0], zone: payload.zone });
-    } catch {
-      throw new Error("Couldn't read the shade from that product image. Try a clearer photo or swatch.");
-    }
-    if (!shade?.hex || !/^#?[0-9A-Fa-f]{6}$/.test(shade.hex.trim())) {
-      throw new Error("Couldn't read the shade from that product image. Try a clearer photo or swatch.");
-    }
-    shade.hex = shade.hex.startsWith('#') ? shade.hex : `#${shade.hex}`;
-  }
+  // Shade extraction pre-step removed 2026-05-25 (second pass): the Gemini
+  // call added latency, cost, and a failure path while providing marginal
+  // benefit. GPT reads the product colour, pattern, and finish directly
+  // from the reference image. The verbose preservation prompts stay; only
+  // the hex/finish placeholders are gone. shade kept as null for
+  // back-compat with the tryon_jobs.shade column.
+  const shade = null;
 
   // Step 2: generate try-on image. Both providers via fal.ai now.
   //   Beauty   → fal.ai/openai/gpt-image-2/edit at quality:high (verbose
-  //              hex-anchored prompts with shade extracted from Gemini)
+  //              preservation prompts, no shade extraction)
   //   Clothing → fal.ai/fal-ai/nano-banana-2/edit
   //
   // NO FALLBACK between models. If the chosen endpoint errors, the error
@@ -953,10 +872,10 @@ async function handleTryOn(payload: {
       images,
     });
   } else {
-    const beautyPrompt = mode === 'single' && shade
-      ? buildTryOnPrompt(payload.zone, shade.hex, shade.description, shade.finish)
+    const beautyPrompt = mode === 'single'
+      ? buildTryOnPrompt(payload.zone)
       : buildMultiTryOnPrompt(productImages.length);
-    console.log(`[try-on] fal openai/gpt-image-2/edit (high, mode=${mode}, zone=${payload.zone}, products=${productImages.length}, hex=${shade?.hex ?? 'n/a'}, finish=${shade?.finish ?? 'n/a'})`);
+    console.log(`[try-on] fal openai/gpt-image-2/edit (high, mode=${mode}, zone=${payload.zone}, products=${productImages.length})`);
     // No try/catch — if fal.ai's gpt-image-2 endpoint fails, throw and let
     // the dispatcher refund the credit. Do NOT fall back to anything else.
     imageBase64 = await callFalGptImage2({
@@ -1239,7 +1158,7 @@ const FREE_TASKS = new Set(['get-job-status']);
 // the Supabase logs which deploy is live and which models route where.
 // Look for this line in the logs after deploy to confirm the new code is up.
 console.log(
-  `[boot] blendrr-ai live | beauty=fal.ai/openai/gpt-image-2/edit @ high (verbose prompts + Gemini shade) | clothing=fal.ai/nano-banana-2/edit | text=${TEXT_MODEL} | rev=2026-05-25-verbose-prompts-high`,
+  `[boot] blendrr-ai live | beauty=fal.ai/openai/gpt-image-2/edit @ high (verbose prompts, no shade extraction) | clothing=fal.ai/nano-banana-2/edit | text=${TEXT_MODEL} | rev=2026-05-25-verbose-no-hex`,
 );
 
 serve(async (req) => {
