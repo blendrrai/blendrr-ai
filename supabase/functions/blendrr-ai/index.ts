@@ -851,11 +851,18 @@ async function handleTryOn(payload: {
   }
 
   // Step 2: generate try-on image.
-  //   Beauty   → OpenAI gpt-image-1 (better at lipstick / foundation finishes,
-  //              and integrates with the shade-extraction pre-step).
-  //   Clothing → Gemini 2.5 Flash Image (better garment-on-body editing,
-  //              ~3x cheaper, ~5x faster, and no skin-tone drift issues we've
-  //              seen on gpt-image-1 for clothing).
+  //   Beauty   → OpenAI gpt-image-1 ONLY (better at lipstick / foundation
+  //              finishes, integrates with shade-extraction pre-step).
+  //   Clothing → fal.ai nano-banana-2/edit ONLY (Nano Banana hosted, sharper
+  //              than direct Gemini due to extra inference steps + post-
+  //              processing).
+  //
+  // NO FALLBACK between providers. If the chosen vendor errors, the error
+  // bubbles up to the async dispatcher, which refunds the credit and marks
+  // the job as failed. The user then sees "That didn't land" with the
+  // underlying error message. Mixing providers when one fails would produce
+  // visually inconsistent results, so we'd rather surface the failure than
+  // silently degrade.
   const images = [
     { data: payload.selfieImage, mime: 'image/jpeg' },
     ...productImages.map((data) => ({ data, mime: 'image/jpeg' })),
@@ -866,6 +873,8 @@ async function handleTryOn(payload: {
     const cz: ClothingZone = payload.clothingZone ?? 'top';
     const clothingPrompt = buildClothingTryOnPrompt(cz);
     console.log(`[try-on] fal nano-banana-2 (clothing, zone=${cz}, products=${productImages.length})`);
+    // No try/catch — if fal.ai fails, throw and let the dispatcher refund
+    // the credit. Do NOT fall back to OpenAI for clothing.
     imageBase64 = await callFalNanoBanana({
       prompt: clothingPrompt,
       images,
