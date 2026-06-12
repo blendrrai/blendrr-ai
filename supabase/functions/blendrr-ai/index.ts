@@ -344,25 +344,29 @@ type Zone =
   | 'eyebrows'
   | 'hair';
 
-// Build the simple prompt sent to gpt-image-1 for a single-product makeup
-// try-on. ChatGPT-direct experiments showed that a one-line conversational
-// prompt + the selfie + product image produces strictly better results than
-// our previous verbose hex-anchored prompt — GPT reads the colour, finish,
-// and texture directly from the reference image, and its identity-
-// preservation defaults are already strong. Heavy preservation prompts
-// were causing the model to drift more, not less.
+// Two-sentence prompts: a conversational request + an explicit face-
+// preservation clause. ChatGPT-direct experiments showed that a short
+// natural prompt outperforms our previous 80-line preservation walls.
+// The second sentence adds the one constraint gpt-image-1 sometimes drifts
+// on (face features / shape / skin tone), without overwhelming the model
+// with a long negation list.
+//
+// For zones that genuinely change the skin's appearance (foundation,
+// concealer), we drop "skin tone" from the preservation clause and keep
+// only features + shape — otherwise the model gets contradictory signals
+// ("apply foundation but don't change skin").
 function buildTryOnPrompt(zone: Zone): string {
   switch (zone) {
-    case 'lips':       return 'Add this lipstick on me.';
-    case 'foundation': return 'Apply this foundation on me.';
-    case 'concealer':  return 'Apply this concealer on me.';
-    case 'blush':      return 'Apply this blush on me.';
-    case 'bronzer':    return 'Apply this bronzer on me.';
-    case 'eyeshadow':  return 'Apply this eyeshadow on me.';
-    case 'eyeliner':   return 'Apply this eyeliner on me.';
-    case 'mascara':    return 'Apply this mascara on me.';
-    case 'eyebrows':   return 'Apply this eyebrow product on me.';
-    case 'hair':       return 'Apply this hair colour on me.';
+    case 'lips':       return 'Add this lipstick on me. Keep my face, skin tone, and features exactly the same.';
+    case 'foundation': return 'Apply this foundation on me. Keep my facial features and face shape exactly the same.';
+    case 'concealer':  return 'Apply this concealer on me. Keep my facial features and face shape exactly the same.';
+    case 'blush':      return 'Apply this blush on me. Keep my face, skin tone, and features exactly the same.';
+    case 'bronzer':    return 'Apply this bronzer on me. Keep my face, skin tone, and features exactly the same.';
+    case 'eyeshadow':  return 'Apply this eyeshadow on me. Keep my face, skin tone, and features exactly the same.';
+    case 'eyeliner':   return 'Apply this eyeliner on me. Keep my face, skin tone, and features exactly the same.';
+    case 'mascara':    return 'Apply this mascara on me. Keep my face, skin tone, and features exactly the same.';
+    case 'eyebrows':   return 'Apply this eyebrow product on me. Keep my face, skin tone, and features exactly the same.';
+    case 'hair':       return 'Apply this hair colour on me. Keep my face, skin tone, and features exactly the same.';
   }
 }
 
@@ -370,7 +374,7 @@ function buildTryOnPrompt(zone: Zone): string {
 // are makeup products. GPT identifies what each one is and applies them to
 // the appropriate region of the face.
 function buildMultiTryOnPrompt(): string {
-  return 'Apply all of these makeup products on me.';
+  return 'Apply all of these makeup products on me. Keep my facial features and face shape exactly the same.';
 }
 
 type ClothingZone = 'top' | 'bottom' | 'dress' | 'shoes' | 'jewelry' | 'accessory';
