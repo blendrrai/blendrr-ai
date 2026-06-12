@@ -385,7 +385,12 @@ Return ONLY this JSON, no preamble:
     contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: 'image/jpeg', data: payload.productImage } }] }],
     generationConfig: { responseMimeType: 'application/json', temperature: 0.1 },
   });
-  return extractJson<{ hex: string; description: string; finish: string }>(extractText(parts));
+  const result = extractJson<{ hex: string; description: string; finish: string }>(extractText(parts));
+  // Log the extracted shade so we can diagnose when the result lipstick
+  // colour doesn't match the product (e.g. nude product → orange-red output
+  // = Gemini misread the bullet colour).
+  console.log(`[describe-shade] zone=${payload.zone} hex=${result?.hex} desc="${result?.description}" finish=${result?.finish}`);
+  return result;
 }
 
 /**
