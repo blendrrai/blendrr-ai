@@ -23,13 +23,16 @@ const TEXT_MODEL = 'gemini-2.5-flash';
 // dropped it on 2026-05-22 — gpt-image-2 isn't broadly available on most
 // accounts and the Gemini fallback drifted from our prompt format. One
 // model, predictable behaviour, easier to debug.
-const OPENAI_IMAGE_MODEL = 'gpt-image-1';
-// Clothing try-ons go through fal.ai's hosted nano-banana-2/edit. Same
-// underlying Nano Banana model lineage as direct Gemini, but fal.ai runs
-// noticeably more inference steps + post-processing per call (~15-25s vs
-// ~3-5s direct) which produces visibly sharper, more faithful output —
-// confirmed against TradeShot which uses the same endpoint. Beauty stays on
-// OpenAI gpt-image-1 — produces better makeup finishes than Gemini.
+const OPENAI_IMAGE_MODEL = 'gpt-image-1'; // legacy — no longer called, kept for ref
+// Both image-edit paths now go through fal.ai:
+//   - Beauty   → fal.ai/openai/gpt-image-2/edit (newer GPT image model with
+//                better defaults than direct OpenAI gpt-image-1 API; fal.ai
+//                also applies its own pre/post-processing).
+//   - Clothing → fal.ai/nano-banana-2/edit (Google Nano Banana family).
+// One vendor (fal.ai), one API key, two endpoints. Direct OpenAI calls have
+// been retired — quality from OpenAI's public API was visibly worse than
+// what ChatGPT.app produces from the same prompts.
+const FAL_GPT_IMAGE_2_URL = 'https://fal.run/openai/gpt-image-2/edit';
 const FAL_NANO_BANANA_URL = 'https://fal.run/fal-ai/nano-banana-2/edit';
 
 // ============================================================================
@@ -328,6 +331,69 @@ async function callFalNanoBanana(opts: {
   return btoa(binary);
 }
 
+/**
+ * Call fal.ai's hosted OpenAI gpt-image-2 endpoint. Returns base64 JPEG.
+ *
+ * Same convention as the other helpers: first image is the canvas, the rest
+ * are references. Quality is fixed at 'medium' — fal.ai's defaults plus
+ * medium quality produces visibly better results than OpenAI's public
+ * gpt-image-1 API at any quality tier, with similar latency (~30-50s).
+ *
+ * Used only for the beauty / makeup try-on path.
+ */
+async function callFalGptImage2(opts: {
+  prompt: string;
+  images: { data: string; mime?: string }[];
+}): Promise<string> {
+  if (!FAL_API_KEY) throw new Error('FAL_API_KEY not configured');
+
+  const imageUrls = opts.images.map((img) => {
+    const mime = img.mime ?? 'image/jpeg';
+    return `data:${mime};base64,${img.data}`;
+  });
+
+  const res = await fetch(FAL_GPT_IMAGE_2_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Key ${FAL_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      prompt: opts.prompt,
+      image_urls: imageUrls,
+      quality: 'medium',
+      num_images: 1,
+      output_format: 'jpeg',
+    }),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`fal.ai gpt-image-2 ${res.status}: ${errorText.slice(0, 240)}`);
+  }
+
+  const data = await res.json();
+  const generatedImageUrl: string | undefined = data?.images?.[0]?.url;
+  if (!generatedImageUrl) {
+    throw new Error(`fal.ai gpt-image-2 returned no image. Response: ${JSON.stringify(data).slice(0, 200)}`);
+  }
+
+  const imageRes = await fetch(generatedImageUrl);
+  if (!imageRes.ok) {
+    throw new Error(`Failed to fetch generated image: HTTP ${imageRes.status}`);
+  }
+  const bytes = new Uint8Array(await imageRes.arrayBuffer());
+  let binary = '';
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode.apply(
+      null,
+      bytes.subarray(i, i + CHUNK) as unknown as number[],
+    );
+  }
+  return btoa(binary);
+}
+
 // ============================================================================
 // Task handlers
 // ============================================================================
@@ -523,19 +589,14 @@ async function handleTryOn(payload: {
   // return value as `null` for back-compat with the tryon_jobs.shade column.
   const shade = null;
 
-  // Step 2: generate try-on image.
-  //   Beauty   → OpenAI gpt-image-1 ONLY (best makeup finishes; prompt is a
-  //              one-line conversational request, no hex extraction).
-  //   Clothing → fal.ai nano-banana-2/edit ONLY (Nano Banana hosted, sharper
-  //              than direct Gemini due to extra inference steps + post-
-  //              processing).
+  // Step 2: generate try-on image. Both providers via fal.ai now.
+  //   Beauty   → fal.ai/openai/gpt-image-2/edit at quality:medium
+  //   Clothing → fal.ai/fal-ai/nano-banana-2/edit
   //
-  // NO FALLBACK between providers. If the chosen vendor errors, the error
+  // NO FALLBACK between models. If the chosen endpoint errors, the error
   // bubbles up to the async dispatcher, which refunds the credit and marks
   // the job as failed. The user then sees "That didn't land" with the
-  // underlying error message. Mixing providers when one fails would produce
-  // visually inconsistent results, so we'd rather surface the failure than
-  // silently degrade.
+  // underlying error message.
   const images = [
     { data: payload.selfieImage, mime: 'image/jpeg' },
     ...productImages.map((data) => ({ data, mime: 'image/jpeg' })),
@@ -553,18 +614,15 @@ async function handleTryOn(payload: {
       images,
     });
   } else {
-    const openAIPrompt = mode === 'single'
+    const beautyPrompt = mode === 'single'
       ? buildTryOnPrompt(payload.zone)
       : buildMultiTryOnPrompt();
-    console.log(`[try-on] openai ${OPENAI_IMAGE_MODEL} (${openAIQuality}, mode=${mode}, zone=${payload.zone}, products=${productImages.length}, stream=${ENABLE_STREAMING}, prompt="${openAIPrompt}")`);
-    imageBase64 = await callOpenAIImageEdit({
-      model: OPENAI_IMAGE_MODEL,
-      prompt: openAIPrompt,
-      quality: openAIQuality,
+    console.log(`[try-on] fal openai/gpt-image-2/edit (medium, mode=${mode}, zone=${payload.zone}, products=${productImages.length}, prompt="${beautyPrompt}")`);
+    // No try/catch — if fal.ai's gpt-image-2 endpoint fails, throw and let
+    // the dispatcher refund the credit. Do NOT fall back to anything else.
+    imageBase64 = await callFalGptImage2({
+      prompt: beautyPrompt,
       images,
-      stream: ENABLE_STREAMING,
-      partialImages: PARTIAL_IMAGES_COUNT,
-      onPartial,
     });
   }
 
@@ -842,7 +900,7 @@ const FREE_TASKS = new Set(['get-job-status']);
 // the Supabase logs which deploy is live and which models route where.
 // Look for this line in the logs after deploy to confirm the new code is up.
 console.log(
-  `[boot] blendrr-ai live | beauty=${OPENAI_IMAGE_MODEL} @ ${IMAGE_QUALITY} | clothing=fal.ai/nano-banana-2/edit | text=${TEXT_MODEL} | rev=2026-05-25-simple-prompts`,
+  `[boot] blendrr-ai live | beauty=fal.ai/openai/gpt-image-2/edit @ medium | clothing=fal.ai/nano-banana-2/edit | text=${TEXT_MODEL} | rev=2026-05-25-fal-gpt-image-2`,
 );
 
 serve(async (req) => {
