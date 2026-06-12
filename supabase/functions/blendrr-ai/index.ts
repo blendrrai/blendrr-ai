@@ -1,7 +1,10 @@
 // Supabase Edge Function: blendrr-ai
-// AI calls fan out to: Gemini (text/vision, shade extraction, quizzes,
-// search-grounded discovery) and OpenAI (image edits / try-on). Clients
-// never see either API key.
+// AI calls fan out to:
+//   - OpenAI gpt-image-1 → makeup try-on (image edits)
+//   - fal.ai nano-banana-2/edit → clothing try-on (image edits)
+//   - Gemini 2.5 Flash → text/vision tasks (quizzes, ingredient scans,
+//     fragrance discovery, skincare/haircare/acne analysis)
+// Clients never see any of the keys.
 // Deploy: `supabase functions deploy blendrr-ai`
 
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
@@ -26,8 +29,7 @@ const OPENAI_IMAGE_MODEL = 'gpt-image-1';
 // noticeably more inference steps + post-processing per call (~15-25s vs
 // ~3-5s direct) which produces visibly sharper, more faithful output —
 // confirmed against TradeShot which uses the same endpoint. Beauty stays on
-// OpenAI gpt-image-1 (better for makeup finishes + integrates with the
-// shade-extraction pre-step).
+// OpenAI gpt-image-1 — produces better makeup finishes than Gemini.
 const FAL_NANO_BANANA_URL = 'https://fal.run/fal-ai/nano-banana-2/edit';
 
 // ============================================================================
@@ -342,366 +344,33 @@ type Zone =
   | 'eyebrows'
   | 'hair';
 
-const FINISH_VISUAL: Record<string, string> = {
-  matte: 'no shine, soft and powdery, completely flat reflectance',
-  satin: 'subtle natural sheen, smooth but not wet',
-  glossy: 'wet, reflective, light-catching, mirror-like highlights',
-  shimmer: 'visible glitter or sparkle particles within the shade',
-  metallic: 'chrome or foil-like, extremely reflective',
-  sheer: 'translucent, low pigment',
-};
-
-async function handleDescribeShade(payload: { productImage: string; zone: string }) {
-  const prompt = `You are a colour-matching specialist for a beauty app. Analyse this image of a cosmetic product (for ${payload.zone}) and return the EXACT hex code of the TRUE makeup shade — the shade as a brand would print it on a colour-block swatch card, NOT how it appears in this specific photo.
-
-PRIORITY ORDER for reading (use the highest available source):
-1. SWATCH BLOCK on white background (brand stock image) — read directly, this IS the true shade
-2. SWATCH on skin/paper — read directly, then mentally brighten ~10% to remove skin undertone bleed
-3. PRODUCT BULLET/PAN visible — read the brightest, most evenly-lit point of the product itself, ignoring shadow side
-4. APPLIED PRODUCT on a model's lips/skin — read from the brightest application area, then brighten by 15-20% to compensate for lip wetness, skin tone, and lighting darkening
-5. PACKAGING ONLY (caps, tubes) — last resort, infer best estimate
-
-CRITICAL accuracy rules:
-- The hex you return represents the shade in PERFECT NEUTRAL LIGHTING. Photo lighting almost always darkens what you see. ERR LIGHTER, NOT DARKER.
-- For nude / pink-toned lipsticks like Pillow Talk Medium, MAC Velvet Teddy, etc — these read as warm pinkish-browns around #B07060 to #C88575. If you find yourself returning anything below #8B5040, you are probably reading shadow, re-sample.
-- For bold reds, full-pigment shades will be saturated (high chroma). If your hex has R, G, B all under 100, you're reading shadow not pigment.
-- For deep berry/wine shades, do read them dark — but again, sample the BRIGHTEST point.
-- DO NOT average across the image. Pick the single brightest, least-shadowed pixel area and read THAT.
-
-IGNORE entirely: tube/bottle/cap material colour, brand labels, background, photo lighting cast, white specular highlights, reflections, watermarks.
-
-Finish definitions:
-- matte: no shine, soft and powdery, completely flat reflectance
-- satin: subtle natural sheen, smooth but not wet
-- glossy: wet, reflective, light-catching, mirror-like highlights
-- shimmer: visible glitter or sparkle particles within the shade
-- metallic: chrome or foil-like, extremely reflective
-- sheer: translucent, low pigment
-
-Return ONLY this JSON, no preamble:
-{ "hex": "#RRGGBB", "description": "max 6 words", "finish": "matte" }`;
-
-  const parts = await callGemini(TEXT_MODEL, {
-    contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: 'image/jpeg', data: payload.productImage } }] }],
-    generationConfig: { responseMimeType: 'application/json', temperature: 0.1 },
-  });
-  const result = extractJson<{ hex: string; description: string; finish: string }>(extractText(parts));
-  // Log the extracted shade so we can diagnose when the result lipstick
-  // colour doesn't match the product (e.g. nude product → orange-red output
-  // = Gemini misread the bullet colour).
-  console.log(`[describe-shade] zone=${payload.zone} hex=${result?.hex} desc="${result?.description}" finish=${result?.finish}`);
-  return result;
+// Build the simple prompt sent to gpt-image-1 for a single-product makeup
+// try-on. ChatGPT-direct experiments showed that a one-line conversational
+// prompt + the selfie + product image produces strictly better results than
+// our previous verbose hex-anchored prompt — GPT reads the colour, finish,
+// and texture directly from the reference image, and its identity-
+// preservation defaults are already strong. Heavy preservation prompts
+// were causing the model to drift more, not less.
+function buildTryOnPrompt(zone: Zone): string {
+  switch (zone) {
+    case 'lips':       return 'Add this lipstick on me.';
+    case 'foundation': return 'Apply this foundation on me.';
+    case 'concealer':  return 'Apply this concealer on me.';
+    case 'blush':      return 'Apply this blush on me.';
+    case 'bronzer':    return 'Apply this bronzer on me.';
+    case 'eyeshadow':  return 'Apply this eyeshadow on me.';
+    case 'eyeliner':   return 'Apply this eyeliner on me.';
+    case 'mascara':    return 'Apply this mascara on me.';
+    case 'eyebrows':   return 'Apply this eyebrow product on me.';
+    case 'hair':       return 'Apply this hair colour on me.';
+  }
 }
 
-/**
- * Build the try-on prompt for the given zone. Structure follows what GPT-Image
- * responds best to: TASK / INPUTS / INSTRUCTIONS / OUTPUT STYLE blocks.
- *
- * Designed to be easy to extend later when we split `face` into sub-zones
- * (foundation, blush, concealer, contour, bronzer). Each sub-zone would get
- * its own case here with tailored INSTRUCTIONS — the TASK/INPUTS/OUTPUT shell
- * stays the same.
- */
-function buildTryOnPrompt(
-  zone: Zone,
-  hex: string,
-  description: string,
-  finish: string,
-): string {
-  const header = `You are a professional beauty AI image editor.`;
-  const outputStyle = `OUTPUT STYLE:\nUltra realistic beauty campaign / iPhone selfie realism. No glam filters, no AI artifacts, no doll-like skin, no plastic textures. The result should look like a real photo of a real person wearing real makeup.`;
-
-  // Reinforced skin-tone preservation. gpt-image leans toward an "idealised"
-  // look by default — slightly tanned, slightly evened — which produced
-  // noticeable skin-colour drift between consecutive try-ons. Repeats the
-  // constraint three ways (must-be-identical / do-not-tan / do-not-lighten)
-  // because repetition + capitals is what reliably overrides the default
-  // beautify behaviour.
-  const skinToneLock = `SKIN TONE — DO NOT CHANGE:
-- The subject's skin tone in the output MUST be IDENTICAL to the input. Sample the forehead, cheek, jawline, and neck — these read at the SAME hue, brightness, and saturation as the original photo.
-- Do NOT tan, bronze, deepen, warm, or darken the skin anywhere on the face, neck, ears, or shoulders.
-- Do NOT lighten, brighten, fair-up, cool down, or wash out the skin anywhere on the face, neck, ears, or shoulders.
-- Do NOT shift the undertone (warm / cool / neutral / olive) by even one step.
-- The makeup zone you are editing is the ONLY region whose colour may change. All other skin pixels stay bit-for-bit the same as the input.
-- Imagine the before/after side by side — outside the makeup zone a viewer must NOT be able to perceive any skin-colour difference.`;
-
-  // Common preservation block — appears in every prompt with minor tweaks.
-  // skinToneLock is prepended so every zone's preservation list leads with
-  // the skin-tone constraint. Earlier prompt tokens carry more weight in
-  // gpt-image's output, so putting it at the top of the preservation block
-  // makes it harder for the model to drift on subsequent lines.
-  const preserveCommon = `${skinToneLock}
-
-OTHER PRESERVATION:
-- Preserve the person's exact identity, facial structure, skin texture, freckles, moles, hairstyle, lighting, shadows, and camera characteristics.
-- Do NOT beautify the person, smooth the skin, alter facial proportions, or remove blemishes.
-- Preserve the original pose, expression, background, framing, crop, aspect ratio, and exact face position within the frame. A user comparing before and after should see the face stay still — only the target region changes.
-- Avoid over-smoothing, AI artifacts, glam filters, or unrealistic skin.`;
-
-  if (zone === 'lips') {
-    return `${header}
-
-TASK:
-Apply the lipstick from the reference product image onto the person's lips in the selfie, naturally and realistically.
-
-INPUTS:
-- 1 selfie image (the first image — this is the canvas you will edit)
-- 1 lipstick product image (the second image — use the lipstick bullet as the colour reference)
-
-INSTRUCTIONS:
-- Match the lipstick shade from the reference image as accurately as possible. Read the colour from the lipstick bullet itself (the cylindrical wax/cream), NOT the cap, tube, or packaging.
-- The shade is approximately ${hex} (${description}) — use as a sanity check; trust the product image as the primary colour source.
-- Apply the lipstick with proper opaque coverage — the natural lip colour must be fully covered. The result should clearly look like worn lipstick, not a sheer tint.
-- Maintain a realistic ${finish} finish (matte = flat; satin = subtle sheen; glossy = wet/reflective; shimmer = sparkle particles).
-- Apply ONLY to the lip surface with realistic edges. Do NOT change lip shape, lip line, philtrum, or surrounding skin.
-${preserveCommon}
-
-${outputStyle}`;
-  }
-
-  if (zone === 'foundation') {
-    return `${header}
-
-TASK:
-Apply the foundation from the reference product image onto the person's face in the selfie, naturally and realistically.
-
-INPUTS:
-- 1 selfie image (the first image — this is the canvas you will edit)
-- 1 foundation product image (the second image — use the swatch or actual cream/liquid colour, NOT the bottle or labels)
-
-INSTRUCTIONS:
-- Match the foundation shade from the reference image. The shade is approximately ${hex} (${description}) — use as a sanity check; trust the product image as primary.
-- Apply foundation across the ENTIRE face — forehead, temples, cheeks, nose, chin, jawline, under-eyes, blending down to the neck. NOT in patches, NOT in stripes, NOT just cheeks.
-- Blend naturally into the skin while preserving pores, freckles, moles, and realistic skin texture. Do NOT over-smooth, retouch, or create doll-like skin.
-- Match the product's finish (${finish}: matte = soft/flat, satin = natural smooth, dewy = subtle glow).
-- Apply ONLY to the SKIN. Do NOT cover the eyes, eyelashes, eyebrows, lips, or hairline.
-${preserveCommon}
-
-${outputStyle}`;
-  }
-
-  if (zone === 'concealer') {
-    return `${header}
-
-TASK:
-Apply the concealer from the reference product image to the targeted areas of the person's face — under-eyes, blemishes, dark spots, redness — naturally.
-
-INPUTS:
-- 1 selfie image (the canvas)
-- 1 concealer product image (use the actual cream/liquid colour as the reference)
-
-INSTRUCTIONS:
-- Match the concealer shade from the reference image. Approximately ${hex} (${description}) — use as a sanity check; trust the product image.
-- Apply ONLY to the typical concealer areas: under-eyes (covering any dark circles), the sides of the nose if needed, and any visible blemishes or redness on the face.
-- This is TARGETED application — NOT full-face like foundation. Most of the skin should remain untouched.
-- Blend the edges seamlessly so there are no visible patches or borders. The result should look like flawless natural skin, not painted-on coverage.
-- Match the product's ${finish} finish — natural and skin-like, never cakey.
-- Do NOT cover the eyes themselves, eyelashes, eyebrows, lips, or hairline.
-${preserveCommon}
-
-${outputStyle}`;
-  }
-
-  if (zone === 'blush') {
-    return `${header}
-
-TASK:
-Apply the blush from the reference product image onto the apples of the person's cheeks, naturally and realistically.
-
-INPUTS:
-- 1 selfie image (the canvas)
-- 1 blush product image (powder pan, cream pot, or stick — use the actual pigment colour)
-
-INSTRUCTIONS:
-- Match the blush shade from the reference image. Approximately ${hex} (${description}) — use as a sanity check; trust the product image.
-- Apply ONLY to the apples of the cheeks (the rounded part that lifts when smiling), with a soft diffused edge blending up toward the temples. Optionally a very light touch on the nose tip for a "flushed" look.
-- This is a SOFT WASH of colour — natural flush, not a painted stripe. The colour should look like the person is naturally a little warmed/flushed.
-- Match the product's finish (${finish}: matte = soft powdery flush, satin = natural healthy glow, dewy/glossy = luminous "lit-from-within" effect).
-- Do NOT extend over the eyes, lips, hairline, jaw, or full cheek area. Stay on the apples only.
-${preserveCommon}
-
-${outputStyle}`;
-  }
-
-  if (zone === 'bronzer') {
-    return `${header}
-
-TASK:
-Apply the bronzer from the reference product image to the perimeter of the person's face — temples, top of cheekbones, jawline, sides of the nose — for a sun-kissed warmth.
-
-INPUTS:
-- 1 selfie image (the canvas)
-- 1 bronzer product image (powder pan or stick — use the actual pigment colour)
-
-INSTRUCTIONS:
-- Match the bronzer shade from the reference image. Approximately ${hex} (${description}) — use as a sanity check; trust the product image.
-- Apply to the areas where the sun naturally hits: temples and forehead perimeter, top of the cheekbones (NOT the apples), along the jawline, and a subtle stroke down the sides of the nose. Forms a soft "3" shape on each side of the face.
-- This is a SUBTLE warming, not heavy contour. The result should look like a light tan or healthy sun-kissed glow, not painted-on shadow.
-- Soft, diffused, blended edges — no visible lines.
-- Match the product's finish (${finish}: matte for cleaner warmth, shimmer for a glow).
-- Do NOT cover the centre of the face (forehead centre, nose bridge, apples of cheeks, chin) — that stays the natural skin tone for contrast.
-- Do NOT change lips, eyes, brows, or hair.
-${preserveCommon}
-
-${outputStyle}`;
-  }
-
-  if (zone === 'eyeliner') {
-    return `${header}
-
-TASK:
-Apply the eyeliner from the reference product image along the person's lash lines, naturally and realistically.
-
-INPUTS:
-- 1 selfie image (the canvas)
-- 1 eyeliner product image (pen tip, gel pot, or pencil — use the actual pigment colour)
-
-INSTRUCTIONS:
-- Match the eyeliner shade from the reference image. Approximately ${hex} (${description}) — use as a sanity check; trust the product image.
-- Apply ONLY along the upper lash line (and optionally a thin line on the lower lash line if it matches the product type). Follow the natural eye shape.
-- The line should be crisp, even, and follow the lash line precisely — no shape distortion, no winged extensions beyond the natural eye contour (unless the product is clearly for that and the result still looks like normal makeup).
-- Apply at the product's typical opacity for ${finish} finish.
-- Do NOT change eye shape, eye size, pupil colour, iris colour, eyelash length, or surrounding skin.
-- Do NOT extend the line beyond the outer corner of the eye in a dramatic wing — keep it natural and subtle unless the prompt clearly suggests a wing.
-${preserveCommon}
-
-${outputStyle}`;
-  }
-
-  if (zone === 'eyeshadow') {
-    return `${header}
-
-TASK:
-Apply the eyeshadow from the reference product image onto the person's eyelids, naturally and realistically.
-
-INPUTS:
-- 1 selfie image (the canvas)
-- 1 eyeshadow product image (single pan or palette — use the actual pigment colour)
-
-INSTRUCTIONS:
-- Match the eyeshadow shade from the reference image. Approximately ${hex} (${description}) — use as a sanity check; trust the product image.
-- Apply to the eyelid (lid space from lash line up to the natural crease), with soft blending into the crease and a slight lift toward the outer corner.
-- A subtle touch in the crease and along the lower lash line is fine if it suits the product, but the main concentration is on the lid.
-- This should look like a wearable everyday eyeshadow, not a heavy editorial look — soft, blended, no harsh lines.
-- Match the product's finish (${finish}: matte = soft and flat, shimmer/metallic = catches light, satin = subtle sheen).
-- Do NOT change eye shape, eye size, lash length, brows, or surrounding skin.
-${preserveCommon}
-
-${outputStyle}`;
-  }
-
-  if (zone === 'mascara') {
-    return `${header}
-
-TASK:
-Apply the mascara from the reference product image to the person's eyelashes, lengthening and darkening them naturally.
-
-INPUTS:
-- 1 selfie image (the canvas)
-- 1 mascara product image (tube, wand, or swatch — use the pigment colour, usually black or brown)
-
-INSTRUCTIONS:
-- Match the mascara shade from the reference image. Approximately ${hex} (${description}) — use as a sanity check; trust the product image.
-- Apply ONLY to the eyelashes — upper and lower lashes both visible if present in the source.
-- Lashes should look darker, slightly thicker, and slightly longer/more defined — like a single coat of mascara has been applied. NOT extreme false-lash levels.
-- Preserve the natural lash direction and shape. Do NOT add fake-looking spider lashes, clumps, or cartoon thickness.
-- Match the product's typical look (regular = natural, volumising = thicker, lengthening = longer).
-- Do NOT change eye shape, eye colour, pupil, iris, skin around the eyes, or eyebrows.
-${preserveCommon}
-
-${outputStyle}`;
-  }
-
-  if (zone === 'eyebrows') {
-    return `${header}
-
-TASK:
-Apply the brow product from the reference image to the person's eyebrows, filling and defining them naturally.
-
-INPUTS:
-- 1 selfie image (the canvas)
-- 1 brow product image (pencil, pomade, gel, or powder — use the actual pigment colour)
-
-INSTRUCTIONS:
-- Match the brow product shade from the reference image. Approximately ${hex} (${description}) — use as a sanity check; trust the product image.
-- Fill in sparse areas of the existing eyebrows so they look slightly fuller and more defined. Follow the EXISTING brow shape precisely — do NOT change brow position, arch height, length, or thickness beyond gentle filling.
-- The result should look like the person has neatly groomed brows with a little extra colour — not drawn-on cartoon brows.
-- Match the product's finish (${finish}: pencil = soft hair-like strokes, pomade = defined, gel = brushed-up and held).
-- Do NOT change eye shape, lashes, skin tone, or any other facial feature.
-- Do NOT extend the brows beyond their natural start and end points.
-${preserveCommon}
-
-${outputStyle}`;
-  }
-
-  if (zone === 'hair') {
-    return `${header}
-
-TASK:
-Apply the hair colour from the reference product image onto the person's hair in the selfie, naturally and realistically.
-
-INPUTS:
-- 1 selfie image (the canvas)
-- 1 hair colour product image (use the colour swatch or sample as the reference)
-
-INSTRUCTIONS:
-- Match the hair colour from the reference image as accurately as possible.
-- The shade is approximately ${hex} (${description}) — use as a sanity check; trust the product image.
-- Recolour the hair while preserving natural strand texture, highlights, lowlights, and dimensional colour variation that real hair has. Do NOT make the hair look flat, painted, or like a solid colour block.
-- Do NOT change hair shape, length, parting, fly-aways, or hairline position.
-- Apply ONLY to hair strands. Do NOT change face, skin, eyebrows, eyelashes, or background.
-${preserveCommon}
-
-${outputStyle}`;
-  }
-
-  // Exhaustiveness fallback — shouldn't be reached with valid Zone type.
-  throw new Error(`Unknown zone: ${zone}`);
-}
-
-/**
- * Build the full-face multi-product prompt for OpenAI.
- * The selfie is image 1; subsequent images (2..N) are makeup products. The AI
- * identifies what each product is (lipstick, foundation, blush, etc.) and
- * applies each to its appropriate area on the face.
- */
-function buildMultiTryOnPrompt(productCount: number): string {
-  return `You are a professional beauty AI image editor.
-
-TASK:
-Apply a complete makeup look to the person in the selfie. The selfie is the FIRST image. The next ${productCount} image${productCount === 1 ? '' : 's'} ${productCount === 1 ? 'is' : 'are'} makeup products — identify what each one is (lipstick, foundation, concealer, blush, bronzer, eyeshadow, eyeliner, mascara, eyebrow product, etc.) and apply each to its appropriate area on the face.
-
-INPUTS:
-- Image 1: a portrait selfie (this is the canvas you will edit)
-- Images 2–${productCount + 1}: makeup products (foundation/lipstick/blush/etc. — figure out what each one is from the image)
-
-INSTRUCTIONS:
-- For each product in images 2–${productCount + 1}, identify what type of makeup it is and apply it to the correct area:
-  • Lipstick → lips (opaque coverage, the lipstick's exact colour, matte/satin/gloss as appropriate)
-  • Foundation → entire face, blended naturally over the skin, preserving texture
-  • Concealer → under-eyes and any visible blemishes (targeted, not full-face)
-  • Blush → apples of the cheeks (soft diffused wash)
-  • Bronzer → temples, top of cheekbones, jawline (subtle warmth, not heavy contour)
-  • Eyeshadow → eyelids (lid space, with soft blending into the crease)
-  • Eyeliner → along the lash line
-  • Mascara → eyelashes (darken and slightly define, not extreme)
-  • Eyebrow product → fill in brows following existing shape
-  • Hair colour → hair strands only
-- Match each product's exact colour from its image. Read the colour from the actual product (lipstick bullet, swatch, cream, powder) — NOT the cap, tube, label, or packaging.
-- Apply each product realistically and proportionately. The full look should feel cohesive and wearable, like real makeup done by a professional — not a stage look.
-
-SKIN TONE — DO NOT CHANGE:
-- The subject's overall skin tone MUST be IDENTICAL to the input. Sample the forehead, jawline, and neck — these read at the SAME hue, brightness, and saturation as the original.
-- Do NOT tan, bronze, deepen, warm, or darken the skin anywhere on the face, neck, ears, or shoulders. Do NOT lighten, brighten, fair-up, cool down, or wash out the skin anywhere.
-- Do NOT shift the undertone (warm / cool / neutral / olive).
-- If foundation is one of the products, apply it as a thin, natural-looking layer that matches the EXISTING skin tone — foundation must not be used as an excuse to lift or tan the overall face. The neck must continue to match the face.
-
-- Preserve the person's identity, facial structure, skin texture, freckles, moles, hairstyle (unless hair colour was a product), lighting, shadows, and background. Do NOT beautify, smooth, alter proportions, or remove blemishes.
-- Preserve the original pose, expression, framing, crop, aspect ratio, and exact face position. A user comparing before and after should see the face stay still — only the applied makeup should differ.
-- Avoid AI artifacts, glam filters, doll-like skin, painted-on edges, or anything that looks unnatural.
-
-OUTPUT STYLE:
-Ultra realistic beauty campaign / iPhone selfie realism. No glam filters, no AI artifacts, no doll-like skin, no plastic textures. The result should look like a real photo of a real person wearing real makeup that they've applied themselves.`;
+// Multi-product full-face try-on. The selfie is image 1; the next N images
+// are makeup products. GPT identifies what each one is and applies them to
+// the appropriate region of the face.
+function buildMultiTryOnPrompt(): string {
+  return 'Apply all of these makeup products on me.';
 }
 
 type ClothingZone = 'top' | 'bottom' | 'dress' | 'shoes' | 'jewelry' | 'accessory';
@@ -839,25 +508,20 @@ async function handleTryOn(payload: {
     throw new Error('Multi mode supports up to 5 products.');
   }
 
-  // Step 1 (BEAUTY only): describe shade. Clothing skips this entirely since
-  // we want the AI to read the garment colour, pattern, and texture directly
-  // from the reference image — no hex extraction makes sense for clothing.
-  let shade: { hex: string; description: string; finish: string } | null = null;
-  if (category === 'beauty' && mode === 'single') {
-    try {
-      shade = await handleDescribeShade({ productImage: productImages[0], zone: payload.zone });
-    } catch {
-      throw new Error("Couldn't read the shade from that product image. Try a clearer photo or swatch.");
-    }
-    if (!shade?.hex || !/^#?[0-9A-Fa-f]{6}$/.test(shade.hex.trim())) {
-      throw new Error("Couldn't read the shade from that product image. Try a clearer photo or swatch.");
-    }
-    shade.hex = shade.hex.startsWith('#') ? shade.hex : `#${shade.hex}`;
-  }
+  // Beauty try-ons used to run a Gemini "describe shade" pre-step that
+  // extracted a hex code from the product image and stuffed it into the
+  // GPT prompt. Removed 2026-05-25: testing showed that ChatGPT directly,
+  // given just the selfie + product image + "Add this lipstick on me",
+  // produced visibly better results than our verbose hex-anchored pipeline.
+  // GPT reads the product colour directly from the reference image — the
+  // hex was at best redundant and at worst conflicting with what the model
+  // actually saw. shade is no longer extracted; the field stays in the
+  // return value as `null` for back-compat with the tryon_jobs.shade column.
+  const shade = null;
 
   // Step 2: generate try-on image.
-  //   Beauty   → OpenAI gpt-image-1 ONLY (better at lipstick / foundation
-  //              finishes, integrates with shade-extraction pre-step).
+  //   Beauty   → OpenAI gpt-image-1 ONLY (best makeup finishes; prompt is a
+  //              one-line conversational request, no hex extraction).
   //   Clothing → fal.ai nano-banana-2/edit ONLY (Nano Banana hosted, sharper
   //              than direct Gemini due to extra inference steps + post-
   //              processing).
@@ -885,10 +549,10 @@ async function handleTryOn(payload: {
       images,
     });
   } else {
-    const openAIPrompt = mode === 'single' && shade
-      ? buildTryOnPrompt(payload.zone, shade.hex, shade.description, shade.finish)
-      : buildMultiTryOnPrompt(productImages.length);
-    console.log(`[try-on] openai ${OPENAI_IMAGE_MODEL} (${openAIQuality}, mode=${mode}, products=${productImages.length}, stream=${ENABLE_STREAMING})`);
+    const openAIPrompt = mode === 'single'
+      ? buildTryOnPrompt(payload.zone)
+      : buildMultiTryOnPrompt();
+    console.log(`[try-on] openai ${OPENAI_IMAGE_MODEL} (${openAIQuality}, mode=${mode}, zone=${payload.zone}, products=${productImages.length}, stream=${ENABLE_STREAMING}, prompt="${openAIPrompt}")`);
     imageBase64 = await callOpenAIImageEdit({
       model: OPENAI_IMAGE_MODEL,
       prompt: openAIPrompt,
