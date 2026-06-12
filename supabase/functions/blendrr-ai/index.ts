@@ -838,6 +838,13 @@ Return ONLY this JSON:
 // Tasks that read state without consuming a credit (status checks, etc.)
 const FREE_TASKS = new Set(['get-job-status']);
 
+// Boot banner — printed once per cold start. Makes it instantly obvious in
+// the Supabase logs which deploy is live and which models route where.
+// Look for this line in the logs after deploy to confirm the new code is up.
+console.log(
+  `[boot] blendrr-ai live | beauty=${OPENAI_IMAGE_MODEL} @ ${IMAGE_QUALITY} | clothing=fal.ai/nano-banana-2/edit | text=${TEXT_MODEL} | rev=2026-05-25-simple-prompts`,
+);
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -848,6 +855,12 @@ serve(async (req) => {
 
     if (!userId) return json({ error: 'Missing userId' }, 400);
     if (!task) return json({ error: 'Missing task' }, 400);
+
+    // Always log the incoming task so we can correlate this entry with
+    // the try-on logs that follow. If you don't see a [try-on] line after
+    // this for a beauty/clothing request, the request failed before reaching
+    // handleTryOn (auth, credit check, etc.).
+    console.log(`[dispatch] task=${task} userId=${userId.slice(0, 8)}…`);
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
