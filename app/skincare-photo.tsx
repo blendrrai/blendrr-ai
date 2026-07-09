@@ -29,6 +29,7 @@ export default function SkincarePhoto() {
               title: 'Add a skin selfie',
               cameraLabel: 'Take selfie',
               libraryLabel: 'Pick from library',
+              preferredCamera: 'front',
             })
           }
           emptyTitle="Add a skin selfie"

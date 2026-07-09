@@ -51,6 +51,10 @@ export default function SelfieStep() {
               title: isClothing ? 'Add a body photo' : 'Add a selfie',
               cameraLabel: isClothing ? 'Take photo' : 'Take selfie',
               libraryLabel: 'Pick from library',
+              // Selfies want the front camera by default; body photos for
+              // clothing try-on are usually taken by someone else with the
+              // back camera or use a mirror, so leave that as back.
+              preferredCamera: isClothing ? 'back' : 'front',
             })
           }
           emptyTitle={isClothing ? 'Add your body photo' : 'Add your selfie'}

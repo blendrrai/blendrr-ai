@@ -29,6 +29,7 @@ export default function AcnePhoto() {
               title: 'Add a photo',
               cameraLabel: 'Take photo',
               libraryLabel: 'Pick from library',
+              preferredCamera: 'front',
             })
           }
           emptyTitle="Add a clear photo"
