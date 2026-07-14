@@ -1217,7 +1217,7 @@ serve(async (req) => {
     if (userError || !user) return json({ error: 'User not found' }, 401);
 
     // Credit cost — flat 1 credit per AI action for free users. New users
-    // get 5 free uses (see schema default). Pro users bypass the credit
+    // get 3 free uses (see schema default). Pro users bypass the credit
     // system entirely — they're billed monthly by Apple and have unlimited
     // access for the duration of their subscription.
     const isPro = user.tier === 'pro';

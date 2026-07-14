@@ -102,7 +102,7 @@ export function PaywallModal() {
             <Text style={styles.eyebrow}>YOU'VE USED YOUR FREE TRIES</Text>
             <Text style={styles.title}>Go Pro to keep going</Text>
             <Text style={styles.subtitle}>
-              Your 5 free AI uses are up. BLENDRR Pro gives you 30 AI uses every month — spend them
+              Your 3 free AI uses are up. BLENDRR Pro gives you 30 AI uses every month — spend them
               on try-ons, quizzes, or ingredient scans.
             </Text>
 

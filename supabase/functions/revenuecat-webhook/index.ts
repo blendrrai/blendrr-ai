@@ -117,7 +117,7 @@ serve(async (req) => {
       id: userId,
       referral_code: userId.slice(0, 6).toUpperCase(),
       tier: 'free',
-      credits: 5,
+      credits: 3,
     });
     if (insertErr) {
       console.log(`[rc-webhook] stub insert failed: ${insertErr.message}`);

@@ -39,7 +39,7 @@ const PRO_PRICES: Record<Currency, string> = {
   EUR: '€12.99',
 };
 
-const FREE_INITIAL_USES = 5;
+const FREE_INITIAL_USES = 3;
 
 const PRO_FEATURES = [
   '30 AI uses every month',
