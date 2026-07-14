@@ -21,9 +21,16 @@ import {
   ensureUserProvisioned,
   getCachedUser,
   redeemReferralCode,
+  refreshUser,
   subscribeUser,
+  updateCachedUser,
   type User,
 } from '../../lib/user';
+import {
+  isProFromCustomerInfo,
+  purchaseMonthly,
+  restorePurchases as restorePurchasesRC,
+} from '../../lib/purchases';
 import { LEGAL_URLS } from '../../lib/legal';
 
 const PRO_PRICES: Record<Currency, string> = {
@@ -101,22 +108,29 @@ export default function Credits() {
   const currency = sub.currency ?? 'GBP';
   const proPrice = PRO_PRICES[currency];
 
-  const upgrade = () => {
-    Alert.alert(
-      `BLENDRR Pro — ${proPrice}/month`,
-      '30 AI uses every month — spend them on try-ons, quizzes, or ingredient scans. Ultra HD quality throughout. Auto-renews monthly. Cancel anytime. Billing flow wires up next via RevenueCat.',
-      [
-        { text: 'Not now', style: 'cancel' },
-        {
-          text: 'Simulate Pro',
-          onPress: async () => {
-            const next: Subscription = { ...sub, tier: 'pro' };
-            await saveSubscription(next);
-            setSub(next);
-          },
-        },
-      ],
-    );
+  const [upgrading, setUpgrading] = useState(false);
+  const upgrade = async () => {
+    if (upgrading) return;
+    setUpgrading(true);
+    try {
+      const info = await purchaseMonthly();
+      if (isProFromCustomerInfo(info)) {
+        // Optimistic local update — the RC webhook updates the server row
+        // within seconds and refreshUser below picks that up.
+        updateCachedUser({ tier: 'pro' });
+        refreshUser().catch(() => {});
+        Alert.alert(
+          "You're in ✨",
+          "Welcome to BLENDRR Pro. You've got 30 AI uses this month — spend them on try-ons, quizzes, or ingredient scans.",
+        );
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Something went wrong';
+      if (msg === 'Purchase cancelled.') return; // user tapped Cancel in StoreKit sheet
+      Alert.alert("Couldn't complete purchase", msg);
+    } finally {
+      setUpgrading(false);
+    }
   };
 
   const [restoring, setRestoring] = useState(false);
@@ -124,21 +138,19 @@ export default function Credits() {
     if (restoring) return;
     setRestoring(true);
     try {
-      // PLACEHOLDER until RevenueCat is wired. Replace this block with:
-      //   const customerInfo = await Purchases.restorePurchases();
-      //   then check customerInfo.entitlements.active for 'pro' and apply.
-      // For now: refresh the server-side user state and show an appropriate
-      // message based on what we already know about this account.
-      const user = await ensureUserProvisioned();
-      if (user.tier === 'pro') {
+      const info = await restorePurchasesRC();
+      const isPro = isProFromCustomerInfo(info);
+      if (isPro) {
+        updateCachedUser({ tier: 'pro' });
+        refreshUser().catch(() => {});
         Alert.alert(
           'Restored',
-          'Your BLENDRR Pro subscription is active on this account.',
+          'Your BLENDRR Pro subscription is active on this Apple ID.',
         );
       } else {
         Alert.alert(
           'Nothing to restore',
-          "No active purchases found for this Apple ID. If you've subscribed or bought credits on another device, sign in with the same Apple ID and tap Restore Purchases again.",
+          "No active purchases found for this Apple ID. If you've subscribed on another device, sign in with the same Apple ID and try again.",
         );
       }
     } catch (e) {

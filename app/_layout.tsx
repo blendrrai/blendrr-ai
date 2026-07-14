@@ -6,7 +6,9 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LookProvider } from '../lib/state';
 import { colors } from '../lib/theme';
-import { ensureUserProvisioned, refreshUser } from '../lib/user';
+import { ensureUserProvisioned, refreshUser, ensureUserId } from '../lib/user';
+import { initPurchases, subscribeCustomerInfo, isProFromCustomerInfo } from '../lib/purchases';
+import { updateCachedUser } from '../lib/user';
 import { AchievementUnlockModal } from '../components/AchievementUnlockModal';
 import { PaywallModal } from '../components/PaywallModal';
 
@@ -15,9 +17,33 @@ export default function RootLayout() {
   // result is cached in module state and broadcast to subscribers. Doesn't block
   // rendering — the home screen shows fallback "0 credits" until this resolves.
   useEffect(() => {
-    ensureUserProvisioned().catch((e) => {
-      console.warn('[blendrr] user provisioning failed', e);
+    // Provision the anonymous user server-side, then hand the same UUID to
+    // RevenueCat so purchases follow the user across reinstalls (Keychain
+    // survives uninstall + iCloud Keychain sync makes it multi-device).
+    ensureUserProvisioned()
+      .then(async (user) => {
+        try {
+          const uid = user?.id ?? (await ensureUserId());
+          await initPurchases(uid);
+        } catch (e) {
+          console.warn('[blendrr] purchases init failed', e);
+        }
+      })
+      .catch((e) => {
+        console.warn('[blendrr] user provisioning failed', e);
+        // Still try to init RC with the local UUID even if server sync failed
+        ensureUserId().then((uid) => initPurchases(uid)).catch(() => {});
+      });
+
+    // Optimistically flip local tier to 'pro' the moment RC pushes an
+    // entitlement update — the RC webhook will also update the server-side
+    // user row, but that takes a few seconds and we don't want the UI to
+    // lag behind after a successful purchase.
+    const unsub = subscribeCustomerInfo((info) => {
+      const isPro = isProFromCustomerInfo(info);
+      updateCachedUser({ tier: isPro ? 'pro' : 'free' });
     });
+    return unsub;
   }, []);
 
   // Refetch user state from server whenever the app returns from background.

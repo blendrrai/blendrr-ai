@@ -14,6 +14,8 @@ import { Check, Crown, Sparkles, X } from 'lucide-react-native';
 import { colors, radius, shadow, spacing, type } from '../lib/theme';
 import { subscribePaywall } from '../lib/paywall';
 import { LEGAL_URLS } from '../lib/legal';
+import { purchaseMonthly, isProFromCustomerInfo } from '../lib/purchases';
+import { refreshUser, updateCachedUser } from '../lib/user';
 
 const PRO_PRICE = '£9.99';
 const PRO_FEATURES = [
@@ -45,15 +47,30 @@ export function PaywallModal() {
   const subscribe = async () => {
     if (purchasing) return;
     setPurchasing(true);
-    // PLACEHOLDER until RevenueCat is wired. Replace with:
-    //   const offering = await Purchases.getOfferings();
-    //   const monthly = offering.current?.monthly;
-    //   await Purchases.purchasePackage(monthly!);
-    Alert.alert(
-      'Subscribe',
-      'Subscription flow wires up next via RevenueCat. The button will open the native StoreKit sheet for BLENDRR Pro at £9.99/month.',
-      [{ text: 'OK', onPress: () => setPurchasing(false) }],
-    );
+    try {
+      const info = await purchaseMonthly();
+      // Optimistic client update — the RC webhook will separately update
+      // the server-side user row within seconds. refreshUser() below picks
+      // that up once the webhook has landed.
+      if (isProFromCustomerInfo(info)) {
+        updateCachedUser({ tier: 'pro' });
+      }
+      // Pull the server-side row too so credits/pro_started_at reflect the
+      // webhook's write. Fire-and-forget — modal already closes on success.
+      refreshUser().catch(() => {});
+      Alert.alert(
+        "You're in ✨",
+        "Welcome to BLENDRR Pro. You've got 30 AI uses this month — spend them on try-ons, quizzes, or ingredient scans.",
+      );
+      setOpen(false);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Something went wrong';
+      // User cancelled the StoreKit sheet — no need to shout at them.
+      if (msg === 'Purchase cancelled.') return;
+      Alert.alert("Couldn't complete purchase", msg);
+    } finally {
+      setPurchasing(false);
+    }
   };
 
   return (

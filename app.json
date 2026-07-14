@@ -55,7 +55,8 @@
           "photosPermission": "Allow BLENDRR Ai to pick selfies and product screenshots from your library."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "react-native-purchases"
     ],
     "extra": {
       "router": {},
